@@ -410,7 +410,7 @@
         <button class="delete-btn" onclick="deleteType('${typeId}')" style="margin-left:20px; position:static; background:#7f8c8d;">Delete Type</button>
       </div>
       <p><strong>Equipment Type / Name:</strong><br>
-        <input type="text" id="type-name-${typeCounter}" placeholder="e.g. Boiler, Air Compressor, Pump...">
+        <input type="text" id="type-name-${typeCounter}" placeholder="">
       </p>
       <div style="margin: 16px 0;">
         <button class="add-btn" onclick="addInstance('${typeId}', ${typeCounter})">+ Add Instance</button>
@@ -436,10 +436,10 @@
       <button class="delete-btn" onclick="deleteInstance('${instId}')">Delete</button>
       <div class="instance-header">Instance #${instanceNumber}</div>
       <p><strong>Description / Model / Location:</strong><br>
-        <textarea placeholder="e.g. Model XYZ-300, located in Boiler Room..." rows="2"></textarea>
+        <textarea placeholder="" rows="2"></textarea>
       </p>
       <p><strong>Hours of Operation:</strong><br>
-        <input type="text" placeholder="e.g. 18 h/day, 6500 h/year">
+        <input type="text" placeholder="">
       </p>
       
       <div class="photo-upload">
