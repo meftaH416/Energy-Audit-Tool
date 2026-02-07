@@ -143,6 +143,14 @@
       border-radius: 5px;
       text-align: center;
     }
+    .storage-info {
+      background: #e8f5e9;
+      border: 1px solid #4caf50;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
   </style>
 </head>
 <body>
@@ -151,7 +159,10 @@
     Created by <a href="https://www.linkedin.com/in/meftah-uddin-972a78125/">Meftah Uddin</a> |
     Web: <a href="https://meftah416.github.io/MeftahUddin.github.io/">MeftahUddin.github.io</a>
   </p>
-  <h1>Energy Audit Tool</h1>
+  <h1>Energy Audit Tool - Unlimited Storage</h1>
+  <div class="storage-info" id="storage-info">
+    💾 Using IndexedDB - Supports 50+ photos | <span id="photo-count">0 photos stored</span>
+  </div>
   <div id="draft-status">Loading...</div>
   <div id="pdf-progress">Generating PDF... Please wait.</div>
 
@@ -171,14 +182,14 @@
       <p>
         <label>Plant Layout:</label><br>
         <input type="file" accept="image/*" id="plant-layout" capture="environment">
-        <small>(Camera on mobile • File picker on PC)</small>
+        <small>(Camera on mobile • File picker on PC • Auto-compressed for storage)</small>
         <div id="plant-photo-preview" class="photo-preview-container"></div>
       </p>
       <p><label for="process-flow">Process Description:</label> <textarea id="process-flow" rows="3" placeholder=""></textarea></p>
       <p>
         <label>Process Flow Diagram:</label><br>
         <input type="file" accept="image/*" id="process-photo" capture="environment">
-        <small>(Camera on mobile • File picker on PC)</small>
+        <small>(Camera on mobile • File picker on PC • Auto-compressed for storage)</small>
         <div id="process-photo-preview" class="photo-preview-container"></div>
       </p>
     </div>
@@ -196,7 +207,147 @@
 </div>
 
 <script>
-  const STORAGE_KEY = 'energy-audit-draft';
+  // ================== IndexedDB Setup ==================
+  const DB_NAME = 'EnergyAuditDB';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'auditData';
+  const PHOTOS_STORE = 'photos';
+  let db;
+
+  // Initialize IndexedDB
+  function initDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        db = request.result;
+        resolve(db);
+      };
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        
+        // Create object stores if they don't exist
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(PHOTOS_STORE)) {
+          db.createObjectStore(PHOTOS_STORE, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+    });
+  }
+
+  // Save data to IndexedDB
+  function saveToIndexedDB(key, data) {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put({ id: key, data: data });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Get data from IndexedDB
+  function getFromIndexedDB(key) {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(key);
+      
+      request.onsuccess = () => resolve(request.result?.data);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Save photo to IndexedDB
+  function savePhoto(photoData) {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([PHOTOS_STORE], 'readwrite');
+      const store = transaction.objectStore(PHOTOS_STORE);
+      const request = store.add({ data: photoData, timestamp: Date.now() });
+      
+      request.onsuccess = () => resolve(request.result); // Returns the photo ID
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Get photo from IndexedDB
+  function getPhoto(photoId) {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([PHOTOS_STORE], 'readonly');
+      const store = transaction.objectStore(PHOTOS_STORE);
+      const request = store.get(photoId);
+      
+      request.onsuccess = () => resolve(request.result?.data);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Get all photos
+  function getAllPhotos() {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([PHOTOS_STORE], 'readonly');
+      const store = transaction.objectStore(PHOTOS_STORE);
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Clear all data
+  function clearAllData() {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME, PHOTOS_STORE], 'readwrite');
+      
+      transaction.objectStore(STORE_NAME).clear();
+      transaction.objectStore(PHOTOS_STORE).clear();
+      
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
+  // ================== Image Compression ==================
+  function compressImage(file, maxWidth = 1200, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Calculate new dimensions
+          if (width > maxWidth) {
+            height = (height / width) * maxWidth;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to base64 with compression
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ================== Core Variables ==================
   let typeCounter = 0;
   const container = document.getElementById('equipment-types-container');
 
@@ -210,8 +361,18 @@
   }
   const debouncedSave = debounce(saveDraft);
 
+  // Update photo count
+  async function updatePhotoCount() {
+    try {
+      const photos = await getAllPhotos();
+      document.getElementById('photo-count').textContent = `${photos.length} photos stored`;
+    } catch (err) {
+      console.error('Error counting photos:', err);
+    }
+  }
+
   // ================== Core Functions ==================
-  function getFormState() {
+  async function getFormState() {
     const state = {
       basic: {
         name: document.getElementById('name')?.value || '',
@@ -226,43 +387,60 @@
         'plant-area': document.getElementById('plant-area')?.value || '',
         'process-flow': document.getElementById('process-flow')?.value || '',
       },
-      plantLayoutPhoto: document.getElementById('plant-photo-preview')?.querySelector('img')?.src || null,
-      processPhoto: document.getElementById('process-photo-preview')?.querySelector('img')?.src || null,
+      plantLayoutPhotoId: null,
+      processPhotoId: null,
       equipmentTypes: []
     };
 
+    // Get plant layout photo ID
+    const plantImg = document.getElementById('plant-photo-preview')?.querySelector('img');
+    if (plantImg && plantImg.dataset.photoId) {
+      state.plantLayoutPhotoId = parseInt(plantImg.dataset.photoId);
+    }
+
+    // Get process photo ID
+    const processImg = document.getElementById('process-photo-preview')?.querySelector('img');
+    if (processImg && processImg.dataset.photoId) {
+      state.processPhotoId = parseInt(processImg.dataset.photoId);
+    }
+
+    // Get equipment types
     document.querySelectorAll('.equipment-type-block').forEach(typeBlock => {
       const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || '';
       const typeState = { name: typeName, instances: [] };
+      
       typeBlock.querySelectorAll('.equipment-instance').forEach(instance => {
         const desc = instance.querySelector('textarea')?.value.trim() || '';
         const hours = instance.querySelector('input[type="text"]')?.value.trim() || '';
-        const photos = Array.from(instance.querySelectorAll('.instance-photo-preview'))
-          .map(div => div.querySelector('img'))
-          .filter(img => img)
-          .map(img => img.src);
-        typeState.instances.push({ desc, hours, photos });
+        const photoIds = Array.from(instance.querySelectorAll('.instance-photo-preview img'))
+          .filter(img => img.dataset.photoId)
+          .map(img => parseInt(img.dataset.photoId));
+        
+        typeState.instances.push({ desc, hours, photoIds });
       });
+      
       if (typeName || typeState.instances.length > 0) {
         state.equipmentTypes.push(typeState);
       }
     });
+    
     return state;
   }
 
-  function saveDraft() {
+  async function saveDraft() {
     try {
-      const state = getFormState();
+      const state = await getFormState();
       const hasContent = Object.values(state.basic).some(v => v.trim()) ||
-                         state.plantLayoutPhoto ||
-                         state.processPhoto ||
+                         state.plantLayoutPhotoId ||
+                         state.processPhotoId ||
                          state.equipmentTypes.length > 0;
 
       if (hasContent) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        await saveToIndexedDB('draft', state);
         document.getElementById('draft-status').textContent =
           `✓ Draft auto-saved at ${new Date().toLocaleTimeString()}`;
         document.getElementById('draft-status').style.color = '#27ae60';
+        await updatePhotoCount();
       } else {
         document.getElementById('draft-status').textContent = 'No data to save yet';
         document.getElementById('draft-status').style.color = '#999';
@@ -271,117 +449,116 @@
       console.error("Error saving draft:", err);
       document.getElementById('draft-status').textContent = '⚠ Save failed';
       document.getElementById('draft-status').style.color = '#e74c3c';
-      if (err.name === "QuotaExceededError") {
-        alert("Storage limit reached. Try removing some photos or clear draft.");
-      }
     }
   }
 
-  function restoreDraft() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) {
-      document.getElementById('draft-status').textContent = 'No saved draft - start entering data';
-      document.getElementById('draft-status').style.color = '#999';
-      return;
-    }
-
-    let state;
+  async function restoreDraft() {
     try {
-      state = JSON.parse(saved);
-    } catch (e) {
-      console.warn("Invalid draft JSON – clearing:", e);
-      localStorage.removeItem(STORAGE_KEY);
-      document.getElementById('draft-status').textContent = 'Invalid draft cleared';
-      document.getElementById('draft-status').style.color = '#e67e22';
-      return;
-    }
+      const state = await getFromIndexedDB('draft');
+      if (!state) {
+        document.getElementById('draft-status').textContent = 'No saved draft - start entering data';
+        document.getElementById('draft-status').style.color = '#999';
+        await updatePhotoCount();
+        return;
+      }
 
-    // Restore basic fields
-    if (state.basic) {
-      Object.entries(state.basic).forEach(([id, val]) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val || '';
-      });
-    }
+      // Restore basic fields
+      if (state.basic) {
+        Object.entries(state.basic).forEach(([id, val]) => {
+          const el = document.getElementById(id);
+          if (el) el.value = val || '';
+        });
+      }
 
-    // Restore Plant Layout photo
-    if (state.plantLayoutPhoto) {
-      const preview = document.getElementById('plant-photo-preview');
-      preview.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = state.plantLayoutPhoto;
-      img.className = 'preview-img';
-      preview.appendChild(img);
-    }
+      // Restore Plant Layout photo
+      if (state.plantLayoutPhotoId) {
+        const photoData = await getPhoto(state.plantLayoutPhotoId);
+        if (photoData) {
+          const preview = document.getElementById('plant-photo-preview');
+          preview.innerHTML = '';
+          const img = document.createElement('img');
+          img.src = photoData;
+          img.dataset.photoId = state.plantLayoutPhotoId;
+          preview.appendChild(img);
+        }
+      }
 
-    // Restore Process Flow photo
-    if (state.processPhoto) {
-      const preview = document.getElementById('process-photo-preview');
-      preview.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = state.processPhoto;
-      img.className = 'preview-img';
-      preview.appendChild(img);
-    }
+      // Restore Process Flow photo
+      if (state.processPhotoId) {
+        const photoData = await getPhoto(state.processPhotoId);
+        if (photoData) {
+          const preview = document.getElementById('process-photo-preview');
+          preview.innerHTML = '';
+          const img = document.createElement('img');
+          img.src = photoData;
+          img.dataset.photoId = state.processPhotoId;
+          preview.appendChild(img);
+        }
+      }
 
-    // Restore equipment
-    if (state.equipmentTypes?.length > 0) {
-      container.innerHTML = '';
-      typeCounter = 0;
+      // Restore equipment
+      if (state.equipmentTypes?.length > 0) {
+        container.innerHTML = '';
+        typeCounter = 0;
 
-      state.equipmentTypes.forEach(typeData => {
-        addEquipmentType(true);  // pass flag to skip default instance
+        for (const typeData of state.equipmentTypes) {
+          addEquipmentType(true);
+          const typeBlock = container.lastElementChild;
+          const typeNameInput = typeBlock.querySelector('input[id^="type-name-"]');
+          if (typeNameInput) typeNameInput.value = typeData.name || '';
 
-        const typeBlock = container.lastElementChild;
-        const typeNameInput = typeBlock.querySelector('input[id^="type-name-"]');
-        if (typeNameInput) typeNameInput.value = typeData.name || '';
+          const instancesDiv = typeBlock.querySelector('.instance-container');
 
-        const instancesDiv = typeBlock.querySelector('.instance-container');
+          for (const instData of typeData.instances) {
+            addInstance(typeBlock.id, typeCounter, true);
+            const instance = instancesDiv.lastElementChild;
+            
+            if (instance) {
+              instance.querySelector('textarea').value = instData.desc || '';
+              instance.querySelector('input[type="text"]').value = instData.hours || '';
 
-        typeData.instances.forEach(instData => {
-          addInstance(typeBlock.id, typeCounter, true);  // skip defaults
-
-          const instance = instancesDiv.lastElementChild;
-          if (instance) {
-            instance.querySelector('textarea').value = instData.desc || '';
-            instance.querySelector('input[type="text"]').value = instData.hours || '';
-
-            // Restore photos with proper structure
-            (instData.photos || []).forEach(src => {
-              addPhotoInput(instance.id);
-              // Find the last added photo wrapper
-              const allWrappers = Array.from(instance.querySelectorAll('.instance-photo-preview'))
-                .map(div => div.parentElement)
-                .filter(el => el.querySelector('input[type="file"]'));
-              const lastWrapper = allWrappers[allWrappers.length - 1];
-              if (lastWrapper) {
-                const photoPreviewDiv = lastWrapper.querySelector('.instance-photo-preview');
-                if (photoPreviewDiv) {
-                  const img = document.createElement('img');
-                  img.src = src;
-                  img.className = 'preview-img';
-                  photoPreviewDiv.appendChild(img);
+              // Restore photos
+              for (const photoId of (instData.photoIds || [])) {
+                const photoData = await getPhoto(photoId);
+                if (photoData) {
+                  addPhotoInput(instance.id);
+                  const allWrappers = Array.from(instance.querySelectorAll('.instance-photo-preview'))
+                    .map(div => div.parentElement)
+                    .filter(el => el.querySelector('input[type="file"]'));
+                  const lastWrapper = allWrappers[allWrappers.length - 1];
+                  
+                  if (lastWrapper) {
+                    const photoPreviewDiv = lastWrapper.querySelector('.instance-photo-preview');
+                    if (photoPreviewDiv) {
+                      const img = document.createElement('img');
+                      img.src = photoData;
+                      img.dataset.photoId = photoId;
+                      photoPreviewDiv.appendChild(img);
+                    }
+                  }
                 }
               }
-            });
+            }
           }
-        });
-      });
-    }
+        }
+      }
 
-    document.getElementById('draft-status').textContent = '✓ Draft restored from previous session';
-    document.getElementById('draft-status').style.color = '#3498db';
+      document.getElementById('draft-status').textContent = '✓ Draft restored from previous session';
+      document.getElementById('draft-status').style.color = '#3498db';
+      await updatePhotoCount();
+    } catch (err) {
+      console.error("Error restoring draft:", err);
+      document.getElementById('draft-status').textContent = '⚠ Error restoring draft';
+      document.getElementById('draft-status').style.color = '#e74c3c';
+    }
   }
 
-  function clearDraft() {
-    if (confirm("Clear ALL saved draft data? This cannot be undone.")) {
+  async function clearDraft() {
+    if (confirm("Clear ALL saved draft data including all photos? This cannot be undone.")) {
       try {
-        isClearing = true; // Prevent auto-save during clear
-        localStorage.removeItem(STORAGE_KEY);
-        // Use replace to prevent back button from restoring data
-        window.location.replace(window.location.href);
+        await clearAllData();
+        window.location.reload();
       } catch (err) {
-        isClearing = false;
         console.error("Error clearing draft:", err);
         alert("Failed to clear draft. Please try again.");
       }
@@ -459,7 +636,6 @@
 
   function addPhotoInput(instId) {
     const previewContainer = document.getElementById(`photo-preview-${instId}`);
-    const inputId = `photo-${instId}-${Date.now()}`;
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -483,42 +659,36 @@
     photoPreviewDiv.className = 'instance-photo-preview';
     wrapper.appendChild(photoPreviewDiv);
 
-    input.addEventListener('change', e => {
+    input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
+      
+      try {
+        // Show loading message
+        photoPreviewDiv.innerHTML = '<small>Compressing...</small>';
+        
+        // Compress image
+        const compressed = await compressImage(file);
+        
+        // Save to IndexedDB
+        const photoId = await savePhoto(compressed);
+        
+        // Display preview
         const img = document.createElement('img');
-        img.src = ev.target.result;
-        img.className = 'preview-img';
+        img.src = compressed;
+        img.dataset.photoId = photoId;
         photoPreviewDiv.innerHTML = '';
         photoPreviewDiv.appendChild(img);
+        
         debouncedSave();
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error processing image:', err);
+        photoPreviewDiv.innerHTML = '<small style="color:red;">Error loading image</small>';
+      }
     });
 
     previewContainer.parentElement.insertBefore(wrapper, previewContainer);
     attachAutoSave();
-  }
-
-  function addInput(instId) {
-    const list = document.getElementById(`inputs-${instId}`);
-    const inputRowId = `input-${instId}-${Date.now()}`;
-    const row = document.createElement('div');
-    row.className = 'input-row';
-    row.id = inputRowId;
-    row.innerHTML = `
-      <input type="text" placeholder="e.g. Electricity (kWh), Natural Gas (m³), Steam (kg)...">
-      <button type="button" class="delete-input-btn" onclick="deleteInput('${inputRowId}')">×</button>
-    `;
-    list.appendChild(row);
-    attachAutoSave();
-  }
-
-  function deleteInput(rowId) {
-    document.getElementById(rowId)?.remove();
-    debouncedSave();
   }
 
   function deleteInstance(instId) {
@@ -535,7 +705,7 @@
     }
   }
 
-  // ================== IMPROVED PDF Generation with Image Boundary Fix ==================
+  // ================== PDF Generation ==================
   document.getElementById('download-pdf').onclick = async () => {
     if (!window.jspdf?.jsPDF) {
       alert("PDF library not loaded. Check internet connection.");
@@ -552,10 +722,8 @@
       const pageHeight = 297;
       const margin = 15;
       const maxWidth = pageWidth - 2 * margin;
-      const maxContentHeight = pageHeight - 2 * margin; // Maximum height for content area
       let y = margin;
 
-      // Helper to add new page if needed
       const checkPageBreak = (neededSpace = 15) => {
         if (y + neededSpace > pageHeight - margin) {
           pdf.addPage();
@@ -563,7 +731,6 @@
         }
       };
 
-      // Helper to add text with word wrap
       const addText = (text, fontSize = 11, isBold = false) => {
         checkPageBreak();
         pdf.setFontSize(fontSize);
@@ -573,15 +740,16 @@
         y += lines.length * (fontSize * 0.4) + 3;
       };
 
-      // FIXED: Helper to add image with proper boundary checking
-      const addImage = async (imgSrc, label) => {
-        if (!imgSrc) return;
+      const addImage = async (photoId, label) => {
+        if (!photoId) return;
         
-        // Check if we need a new page for the label
         checkPageBreak(8);
         addText(label, 10, true);
         
         try {
+          const imgSrc = await getPhoto(photoId);
+          if (!imgSrc) return;
+          
           const img = new Image();
           img.src = imgSrc;
           await new Promise((resolve, reject) => {
@@ -589,55 +757,41 @@
             img.onerror = reject;
           });
 
-          // Calculate aspect ratio
           const aspectRatio = img.width / img.height;
-          
-          // Set maximum dimensions considering page boundaries
           const maxImgWidth = maxWidth;
-          const maxImgHeight = 90; // Maximum height for images in mm
+          const maxImgHeight = 90;
           
           let imgWidth, imgHeight;
           
-          // Calculate dimensions maintaining aspect ratio
           if (aspectRatio > 1) {
-            // Landscape image
             imgWidth = maxImgWidth;
             imgHeight = imgWidth / aspectRatio;
-            
-            // If height exceeds max, recalculate
             if (imgHeight > maxImgHeight) {
               imgHeight = maxImgHeight;
               imgWidth = imgHeight * aspectRatio;
             }
           } else {
-            // Portrait or square image
             imgHeight = maxImgHeight;
             imgWidth = imgHeight * aspectRatio;
-            
-            // If width exceeds max, recalculate
             if (imgWidth > maxImgWidth) {
               imgWidth = maxImgWidth;
               imgHeight = imgWidth / aspectRatio;
             }
           }
           
-          // CRITICAL: Check if image fits on current page with buffer
           const remainingSpace = pageHeight - margin - y;
-          const requiredSpace = imgHeight + 5; // Image height plus small buffer
+          const requiredSpace = imgHeight + 5;
           
           if (requiredSpace > remainingSpace) {
-            // Image doesn't fit, add new page
             pdf.addPage();
             y = margin;
           }
           
-          // Double-check we're not placing image outside boundaries
           if (y + imgHeight > pageHeight - margin) {
             pdf.addPage();
             y = margin;
           }
           
-          // Add the image within safe boundaries
           pdf.addImage(imgSrc, 'JPEG', margin, y, imgWidth, imgHeight);
           y += imgHeight + 6;
           
@@ -685,15 +839,15 @@
       y += 5;
 
       // Plant Layout Photo
-      const plantPhoto = document.getElementById('plant-photo-preview')?.querySelector('img')?.src;
-      if (plantPhoto) {
-        await addImage(plantPhoto, "Plant Layout:");
+      const plantImg = document.getElementById('plant-photo-preview')?.querySelector('img');
+      if (plantImg && plantImg.dataset.photoId) {
+        await addImage(parseInt(plantImg.dataset.photoId), "Plant Layout:");
       }
 
       // Process Flow Photo
-      const processPhoto = document.getElementById('process-photo-preview')?.querySelector('img')?.src;
-      if (processPhoto) {
-        await addImage(processPhoto, "Process Flow Diagram:");
+      const processImg = document.getElementById('process-photo-preview')?.querySelector('img');
+      if (processImg && processImg.dataset.photoId) {
+        await addImage(parseInt(processImg.dataset.photoId), "Process Flow Diagram:");
       }
 
       y += 10;
@@ -735,28 +889,29 @@
               addText(`    Operating Hours: ${hours}`, 10);
             }
             
-            // Instance photos - improved handling
+            // Instance photos
             const photos = instance.querySelectorAll('.instance-photo-preview img');
             if (photos.length > 0) {
-              y += 3; // Add spacing before photos
+              y += 3;
               let photoNum = 1;
               for (const photo of photos) {
-                // Ensure we have enough space or create new page
-                const estimatedPhotoSpace = 60; // Estimated space needed for photo
-                if (y + estimatedPhotoSpace > pageHeight - margin) {
-                  pdf.addPage();
-                  y = margin;
+                if (photo.dataset.photoId) {
+                  const estimatedPhotoSpace = 60;
+                  if (y + estimatedPhotoSpace > pageHeight - margin) {
+                    pdf.addPage();
+                    y = margin;
+                  }
+                  await addImage(parseInt(photo.dataset.photoId), `    Photo ${photoNum}:`);
+                  photoNum++;
                 }
-                await addImage(photo.src, `    Photo ${photoNum}:`);
-                photoNum++;
               }
             }
             
-            y += 8; // Add spacing between instances
+            y += 8;
             instNum++;
           }
           
-          y += 5; // Add spacing between equipment types
+          y += 5;
           typeNum++;
         }
       }
@@ -782,51 +937,66 @@
   document.getElementById('add-equipment-type').addEventListener('click', () => addEquipmentType());
   document.getElementById('clear-draft').addEventListener('click', clearDraft);
 
-  // Plant Layout photo preview
-  document.getElementById('plant-layout')?.addEventListener('change', e => {
+  // Plant Layout photo handler
+  document.getElementById('plant-layout')?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const preview = document.getElementById('plant-photo-preview');
+    
+    const preview = document.getElementById('plant-photo-preview');
+    preview.innerHTML = '<small>Compressing image...</small>';
+    
+    try {
+      const compressed = await compressImage(file);
+      const photoId = await savePhoto(compressed);
+      
       preview.innerHTML = '';
       const img = document.createElement('img');
-      img.src = ev.target.result;
-      img.className = 'preview-img';
+      img.src = compressed;
+      img.dataset.photoId = photoId;
       preview.appendChild(img);
+      
       debouncedSave();
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // Process Flow photo preview
-  document.getElementById('process-photo').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const preview = document.getElementById('process-photo-preview');
-      preview.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = ev.target.result;
-      img.className = 'preview-img';
-      preview.appendChild(img);
-      debouncedSave();
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // Auto-save before page unload (but not during intentional clear)
-  let isClearing = false;
-  window.addEventListener('beforeunload', (e) => {
-    if (!isClearing) {
-      saveDraft(); // Force save on close
+    } catch (err) {
+      console.error('Error processing image:', err);
+      preview.innerHTML = '<small style="color:red;">Error loading image</small>';
     }
   });
 
-  // Start
-  restoreDraft();
-  setTimeout(attachAutoSave, 300);
+  // Process Flow photo handler
+  document.getElementById('process-photo').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const preview = document.getElementById('process-photo-preview');
+    preview.innerHTML = '<small>Compressing image...</small>';
+    
+    try {
+      const compressed = await compressImage(file);
+      const photoId = await savePhoto(compressed);
+      
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = compressed;
+      img.dataset.photoId = photoId;
+      preview.appendChild(img);
+      
+      debouncedSave();
+    } catch (err) {
+      console.error('Error processing image:', err);
+      preview.innerHTML = '<small style="color:red;">Error loading image</small>';
+    }
+  });
+
+  // Initialize
+  initDB()
+    .then(() => {
+      restoreDraft();
+      setTimeout(attachAutoSave, 300);
+    })
+    .catch(err => {
+      console.error('Failed to initialize database:', err);
+      alert('Failed to initialize storage. Please use a modern browser.');
+    });
 </script>
 </body>
 </html>
