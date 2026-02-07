@@ -535,7 +535,7 @@
     }
   }
 
-  // ================== IMPROVED PDF Generation ==================
+  // ================== IMPROVED PDF Generation with Image Boundary Fix ==================
   document.getElementById('download-pdf').onclick = async () => {
     if (!window.jspdf?.jsPDF) {
       alert("PDF library not loaded. Check internet connection.");
@@ -552,6 +552,7 @@
       const pageHeight = 297;
       const margin = 15;
       const maxWidth = pageWidth - 2 * margin;
+      const maxContentHeight = pageHeight - 2 * margin; // Maximum height for content area
       let y = margin;
 
       // Helper to add new page if needed
@@ -572,10 +573,12 @@
         y += lines.length * (fontSize * 0.4) + 3;
       };
 
-      // Helper to add image
+      // FIXED: Helper to add image with proper boundary checking
       const addImage = async (imgSrc, label) => {
         if (!imgSrc) return;
-        checkPageBreak(80);
+        
+        // Check if we need a new page for the label
+        checkPageBreak(8);
         addText(label, 10, true);
         
         try {
@@ -586,13 +589,58 @@
             img.onerror = reject;
           });
 
-          const imgWidth = maxWidth;
-          const imgHeight = (img.height / img.width) * imgWidth;
-          const finalHeight = Math.min(imgHeight, 120);
+          // Calculate aspect ratio
+          const aspectRatio = img.width / img.height;
           
-          checkPageBreak(finalHeight + 5);
-          pdf.addImage(imgSrc, 'JPEG', margin, y, imgWidth, finalHeight);
-          y += finalHeight + 8;
+          // Set maximum dimensions considering page boundaries
+          const maxImgWidth = maxWidth;
+          const maxImgHeight = 90; // Maximum height for images in mm
+          
+          let imgWidth, imgHeight;
+          
+          // Calculate dimensions maintaining aspect ratio
+          if (aspectRatio > 1) {
+            // Landscape image
+            imgWidth = maxImgWidth;
+            imgHeight = imgWidth / aspectRatio;
+            
+            // If height exceeds max, recalculate
+            if (imgHeight > maxImgHeight) {
+              imgHeight = maxImgHeight;
+              imgWidth = imgHeight * aspectRatio;
+            }
+          } else {
+            // Portrait or square image
+            imgHeight = maxImgHeight;
+            imgWidth = imgHeight * aspectRatio;
+            
+            // If width exceeds max, recalculate
+            if (imgWidth > maxImgWidth) {
+              imgWidth = maxImgWidth;
+              imgHeight = imgWidth / aspectRatio;
+            }
+          }
+          
+          // CRITICAL: Check if image fits on current page with buffer
+          const remainingSpace = pageHeight - margin - y;
+          const requiredSpace = imgHeight + 5; // Image height plus small buffer
+          
+          if (requiredSpace > remainingSpace) {
+            // Image doesn't fit, add new page
+            pdf.addPage();
+            y = margin;
+          }
+          
+          // Double-check we're not placing image outside boundaries
+          if (y + imgHeight > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+          
+          // Add the image within safe boundaries
+          pdf.addImage(imgSrc, 'JPEG', margin, y, imgWidth, imgHeight);
+          y += imgHeight + 6;
+          
         } catch (err) {
           console.error("Error adding image:", err);
           addText("[Image could not be loaded]", 9);
@@ -651,6 +699,7 @@
       y += 10;
 
       // Equipment Details
+      checkPageBreak(20);
       addText("2. EQUIPMENT DETAILS", 14, true);
       y += 5;
 
@@ -661,36 +710,53 @@
       } else {
         let typeNum = 1;
         for (const typeBlock of equipmentTypes) {
-          checkPageBreak(20);
+          checkPageBreak(25);
           
           const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || `Equipment Type ${typeNum}`;
-          addText(`\n${typeNum}. ${typeName}`, 12, true);
+          addText(`${typeNum}. ${typeName}`, 12, true);
+          y += 2;
           
           const instances = typeBlock.querySelectorAll('.equipment-instance');
           let instNum = 1;
           
           for (const instance of instances) {
-            checkPageBreak(15);
+            checkPageBreak(20);
             addText(`  Instance ${instNum}:`, 11, true);
             
             const desc = instance.querySelector('textarea')?.value.trim();
-            if (desc) addText(`    Description: ${desc}`, 10);
-            
-            const hours = instance.querySelector('input[type="text"]')?.value.trim();
-            if (hours) addText(`    Operating Hours: ${hours}`, 10);
-            
-            // Instance photos
-            const photos = instance.querySelectorAll('.instance-photo-preview img');
-            let photoNum = 1;
-            for (const photo of photos) {
-              await addImage(photo.src, `    Photo ${photoNum}:`);
-              photoNum++;
+            if (desc) {
+              checkPageBreak(15);
+              addText(`    Description: ${desc}`, 10);
             }
             
-            y += 5;
+            const hours = instance.querySelector('input[type="text"]')?.value.trim();
+            if (hours) {
+              checkPageBreak(10);
+              addText(`    Operating Hours: ${hours}`, 10);
+            }
+            
+            // Instance photos - improved handling
+            const photos = instance.querySelectorAll('.instance-photo-preview img');
+            if (photos.length > 0) {
+              y += 3; // Add spacing before photos
+              let photoNum = 1;
+              for (const photo of photos) {
+                // Ensure we have enough space or create new page
+                const estimatedPhotoSpace = 60; // Estimated space needed for photo
+                if (y + estimatedPhotoSpace > pageHeight - margin) {
+                  pdf.addPage();
+                  y = margin;
+                }
+                await addImage(photo.src, `    Photo ${photoNum}:`);
+                photoNum++;
+              }
+            }
+            
+            y += 8; // Add spacing between instances
             instNum++;
           }
           
+          y += 5; // Add spacing between equipment types
           typeNum++;
         }
       }
