@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Energy Audit Tool</title>
+  <meta name="Author" content="Meftah Uddin">
+  <meta name="Company" content="University of Missouri Columbia">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f1f4f6;
+      color: #262626;
+      margin: 20px;
+      line-height: 1.5;
+    }
+    h1, h2, h3 { color: #262626; }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .section { margin-bottom: 32px; }
+    .basic-info label {
+      display: inline-block;
+      width: 180px;
+      font-weight: bold;
+      vertical-align: top;
+      padding-top: 8px;
+    }
+    .basic-info input,
+    .basic-info textarea {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 100%;
+      max-width: 500px;
+      box-sizing: border-box;
+    }
+    .equipment-type-block {
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      background: #f8f9fa;
+    }
+    .equipment-type-header {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: #0066cc;
+      margin-bottom: 12px;
+    }
+    .instance-container {
+      margin-left: 16px;
+      margin-top: 12px;
+    }
+    .equipment-instance {
+      border: 1px dashed #999;
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 16px;
+      background: white;
+      position: relative;
+    }
+    .instance-header {
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #c0392b;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .input-row input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .add-btn, .delete-input-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .add-btn { background: #27ae60; color: white; }
+    .delete-input-btn { background: #e67e22; color: white; }
+    .photo-upload { margin-top: 12px; }
+    .photo-preview-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .photo-preview-container img {
+      max-width: 220px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button.global-action {
+      margin-right: 12px;
+      padding: 10px 18px;
+      font-size: 1em;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      color: white;
+    }
+    #add-equipment-type { background: #3498db; }
+    #download-pdf { background: #8e44ad; }
+    input, textarea { font-family: inherit; }
+    #draft-status {
+      font-size: 0.9em;
+      color: #555;
+      margin: 10px 0;
+    }
+    #pdf-progress {
+      display: none;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="content-to-pdf">
+  <p style="text-align:center; color:#0000e9; margin-bottom: 24px;">
+    Created by <a href="https://www.linkedin.com/in/meftah-uddin-972a78125/">Meftah Uddin</a> |
+    Web: <a href="https://meftah416.github.io/MeftahUddin.github.io/">MeftahUddin.github.io</a>
+  </p>
+  <h1>Energy Audit Tool</h1>
+  <div id="draft-status">Loading...</div>
+  <div id="pdf-progress">Generating PDF... Please wait.</div>
+
+  <div class="section">
+    <h2>Basic Information</h2>
+    <div class="basic-info">
+      <p><label for="name">Company Name:</label> <input type="text" id="name"></p>
+      <p><label for="auditor">Auditor Name:</label> <input type="text" id="auditor"></p>
+      <p><label for="address">Company Address:</label> <input type="text" id="address"></p>
+      <p><label for="date">Audit Date:</label> <input type="date" id="date"></p>
+      <p><label for="products">Products Produced:</label> <input type="text" id="products"></p>
+      <p><label for="volume">Product Volume:</label> <input type="text" id="volume"></p>
+      <p><label for="shift">Operating Hours:</label> <input type="text" id="shift" placeholder="e.g. 18 h/day, 6500 h/year"></p>
+      <p><label for="employee">No of Employees:</label> <input type="number" id="employee"></p>
+      <p><label for="raw-materials">Raw Materials:</label> <textarea id="raw-materials" rows="2" placeholder="e.g. Steel sheets, polymers, chemicals..."></textarea></p>
+      <p><label for="plant-area">Plant Area:</label> <textarea id="plant-area" rows="3" placeholder="e.g. 15,000 sq ft total..."></textarea></p>
+      <p>
+        <label>Plant Layout:</label><br>
+        <input type="file" accept="image/*" id="plant-layout" capture="environment">
+        <small>(Camera on mobile • File picker on PC)</small>
+        <div id="plant-photo-preview" class="photo-preview-container"></div>
+      </p>
+      <p><label for="process-flow">Process Description:</label> <textarea id="process-flow" rows="3" placeholder="Brief description..."></textarea></p>
+      <p>
+        <label>Process Flow Diagram:</label><br>
+        <input type="file" accept="image/*" id="process-photo" capture="environment">
+        <small>(Camera on mobile • File picker on PC)</small>
+        <div id="process-photo-preview" class="photo-preview-container"></div>
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Equipment Details</h2>
+    <div id="equipment-types-container"></div>
+    <div style="margin: 28px 0;">
+      <button id="add-equipment-type" class="global-action">➕ Add Equipment Type</button>
+      <button id="download-pdf" class="global-action">📄 Download PDF</button>
+      <button id="clear-draft" class="global-action" style="background:#e74c3c;">🗑️ Clear Draft</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'energy-audit-draft';
+  let typeCounter = 0;
+  const container = document.getElementById('equipment-types-container');
+
+  // ================== Utilities ==================
+  function debounce(fn, delay = 800) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }
+  const debouncedSave = debounce(saveDraft);
+
+  // ================== Core Functions ==================
+  function getFormState() {
+    const state = {
+      basic: {
+        name: document.getElementById('name')?.value || '',
+        auditor: document.getElementById('auditor')?.value || '',
+        address: document.getElementById('address')?.value || '',
+        date: document.getElementById('date')?.value || '',
+        products: document.getElementById('products')?.value || '',
+        volume: document.getElementById('volume')?.value || '',
+        shift: document.getElementById('shift')?.value || '',
+        employee: document.getElementById('employee')?.value || '',
+        'raw-materials': document.getElementById('raw-materials')?.value || '',
+        'plant-area': document.getElementById('plant-area')?.value || '',
+        'process-flow': document.getElementById('process-flow')?.value || '',
+      },
+      plantLayoutPhoto: document.getElementById('plant-photo-preview')?.querySelector('img')?.src || null,
+      processPhoto: document.getElementById('process-photo-preview')?.querySelector('img')?.src || null,
+      equipmentTypes: []
+    };
+
+    document.querySelectorAll('.equipment-type-block').forEach(typeBlock => {
+      const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || '';
+      const typeState = { name: typeName, instances: [] };
+      typeBlock.querySelectorAll('.equipment-instance').forEach(instance => {
+        const desc = instance.querySelector('textarea')?.value.trim() || '';
+        const hours = instance.querySelector('input[type="text"]')?.value.trim() || '';
+        const photos = Array.from(instance.querySelectorAll('.instance-photo-preview'))
+          .map(div => div.querySelector('img'))
+          .filter(img => img)
+          .map(img => img.src);
+        typeState.instances.push({ desc, hours, photos });
+      });
+      if (typeName || typeState.instances.length > 0) {
+        state.equipmentTypes.push(typeState);
+      }
+    });
+    return state;
+  }
+
+  function saveDraft() {
+    try {
+      const state = getFormState();
+      const hasContent = Object.values(state.basic).some(v => v.trim()) ||
+                         state.plantLayoutPhoto ||
+                         state.processPhoto ||
+                         state.equipmentTypes.length > 0;
+
+      if (hasContent) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        document.getElementById('draft-status').textContent =
+          `✓ Draft auto-saved at ${new Date().toLocaleTimeString()}`;
+        document.getElementById('draft-status').style.color = '#27ae60';
+      } else {
+        document.getElementById('draft-status').textContent = 'No data to save yet';
+        document.getElementById('draft-status').style.color = '#999';
+      }
+    } catch (err) {
+      console.error("Error saving draft:", err);
+      document.getElementById('draft-status').textContent = '⚠ Save failed';
+      document.getElementById('draft-status').style.color = '#e74c3c';
+      if (err.name === "QuotaExceededError") {
+        alert("Storage limit reached. Try removing some photos or clear draft.");
+      }
+    }
+  }
+
+  function restoreDraft() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) {
+      document.getElementById('draft-status').textContent = 'No saved draft - start entering data';
+      document.getElementById('draft-status').style.color = '#999';
+      return;
+    }
+
+    let state;
+    try {
+      state = JSON.parse(saved);
+    } catch (e) {
+      console.warn("Invalid draft JSON – clearing:", e);
+      localStorage.removeItem(STORAGE_KEY);
+      document.getElementById('draft-status').textContent = 'Invalid draft cleared';
+      document.getElementById('draft-status').style.color = '#e67e22';
+      return;
+    }
+
+    // Restore basic fields
+    if (state.basic) {
+      Object.entries(state.basic).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val || '';
+      });
+    }
+
+    // Restore Plant Layout photo
+    if (state.plantLayoutPhoto) {
+      const preview = document.getElementById('plant-photo-preview');
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = state.plantLayoutPhoto;
+      img.className = 'preview-img';
+      preview.appendChild(img);
+    }
+
+    // Restore Process Flow photo
+    if (state.processPhoto) {
+      const preview = document.getElementById('process-photo-preview');
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = state.processPhoto;
+      img.className = 'preview-img';
+      preview.appendChild(img);
+    }
+
+    // Restore equipment
+    if (state.equipmentTypes?.length > 0) {
+      container.innerHTML = '';
+      typeCounter = 0;
+
+      state.equipmentTypes.forEach(typeData => {
+        addEquipmentType(true);  // pass flag to skip default instance
+
+        const typeBlock = container.lastElementChild;
+        const typeNameInput = typeBlock.querySelector('input[id^="type-name-"]');
+        if (typeNameInput) typeNameInput.value = typeData.name || '';
+
+        const instancesDiv = typeBlock.querySelector('.instance-container');
+
+        typeData.instances.forEach(instData => {
+          addInstance(typeBlock.id, typeCounter, true);  // skip defaults
+
+          const instance = instancesDiv.lastElementChild;
+          if (instance) {
+            instance.querySelector('textarea').value = instData.desc || '';
+            instance.querySelector('input[type="text"]').value = instData.hours || '';
+
+            // Restore photos with proper structure
+            (instData.photos || []).forEach(src => {
+              addPhotoInput(instance.id);
+              // Find the last added photo wrapper
+              const allWrappers = Array.from(instance.querySelectorAll('.instance-photo-preview'))
+                .map(div => div.parentElement)
+                .filter(el => el.querySelector('input[type="file"]'));
+              const lastWrapper = allWrappers[allWrappers.length - 1];
+              if (lastWrapper) {
+                const photoPreviewDiv = lastWrapper.querySelector('.instance-photo-preview');
+                if (photoPreviewDiv) {
+                  const img = document.createElement('img');
+                  img.src = src;
+                  img.className = 'preview-img';
+                  photoPreviewDiv.appendChild(img);
+                }
+              }
+            });
+          }
+        });
+      });
+    }
+
+    document.getElementById('draft-status').textContent = '✓ Draft restored from previous session';
+    document.getElementById('draft-status').style.color = '#3498db';
+  }
+
+  function clearDraft() {
+    if (confirm("Clear ALL saved draft data? This cannot be undone.")) {
+      try {
+        isClearing = true; // Prevent auto-save during clear
+        localStorage.removeItem(STORAGE_KEY);
+        // Use replace to prevent back button from restoring data
+        window.location.replace(window.location.href);
+      } catch (err) {
+        isClearing = false;
+        console.error("Error clearing draft:", err);
+        alert("Failed to clear draft. Please try again.");
+      }
+    }
+  }
+
+  function attachAutoSave() {
+    document.querySelectorAll('input, textarea, [type="file"]').forEach(el => {
+      el.removeEventListener('input', debouncedSave);
+      el.removeEventListener('change', debouncedSave);
+      el.addEventListener('input', debouncedSave);
+      el.addEventListener('change', debouncedSave);
+    });
+  }
+
+  // ================== UI Builders ==================
+  function addEquipmentType(skipDefaultInstance = false) {
+    typeCounter++;
+    const typeId = `type-${typeCounter}`;
+    const typeBlock = document.createElement('div');
+    typeBlock.className = 'equipment-type-block';
+    typeBlock.id = typeId;
+    typeBlock.innerHTML = `
+      <div class="equipment-type-header">
+        Equipment Type #${typeCounter}
+        <button class="delete-btn" onclick="deleteType('${typeId}')" style="margin-left:20px; position:static; background:#7f8c8d;">Delete Type</button>
+      </div>
+      <p><strong>Equipment Type / Name:</strong><br>
+        <input type="text" id="type-name-${typeCounter}" placeholder="e.g. Boiler, Air Compressor, Pump...">
+      </p>
+      <div style="margin: 16px 0;">
+        <button class="add-btn" onclick="addInstance('${typeId}', ${typeCounter})">+ Add Instance</button>
+      </div>
+      <div class="instance-container" id="instances-${typeId}"></div>
+    `;
+    container.appendChild(typeBlock);
+    if (!skipDefaultInstance) {
+      addInstance(typeId, typeCounter);
+    }
+    attachAutoSave();
+  }
+
+  function addInstance(typeId, typeNum, skipDefaults = false) {
+    const instancesDiv = document.getElementById(`instances-${typeId}`);
+    const currentInstances = instancesDiv.querySelectorAll('.equipment-instance').length;
+    const instanceNumber = currentInstances + 1;
+    const instId = `inst-${typeId}-${instanceNumber}`;
+    const instance = document.createElement('div');
+    instance.className = 'equipment-instance';
+    instance.id = instId;
+    instance.innerHTML = `
+      <button class="delete-btn" onclick="deleteInstance('${instId}')">Delete</button>
+      <div class="instance-header">Instance #${instanceNumber}</div>
+      <p><strong>Description / Model / Location:</strong><br>
+        <textarea placeholder="e.g. Model XYZ-300, located in Boiler Room..." rows="2"></textarea>
+      </p>
+      <p><strong>Hours of Operation:</strong><br>
+        <input type="text" placeholder="e.g. 18 h/day, 6500 h/year">
+      </p>
+      
+      <div class="photo-upload">
+        <strong>Photos / Snapshots:</strong><br>
+        <button type="button" class="add-btn" onclick="addPhotoInput('${instId}')">+ Add Photo</button>
+        <div class="instance-photo-preview photo-preview-container" id="photo-preview-${instId}"></div>
+      </div>
+    `;
+    instancesDiv.appendChild(instance);
+
+    if (!skipDefaults) {
+      addPhotoInput(instId);
+    }
+
+    attachAutoSave();
+  }
+
+  function addPhotoInput(instId) {
+    const previewContainer = document.getElementById(`photo-preview-${instId}`);
+    const inputId = `photo-${instId}-${Date.now()}`;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.style.margin = '8px 0';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = 'Remove';
+    removeBtn.className = 'delete-input-btn';
+    removeBtn.style.marginLeft = '10px';
+    removeBtn.onclick = () => { wrapper.remove(); debouncedSave(); };
+
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.appendChild(input);
+    wrapper.appendChild(removeBtn);
+
+    const photoPreviewDiv = document.createElement('div');
+    photoPreviewDiv.className = 'instance-photo-preview';
+    wrapper.appendChild(photoPreviewDiv);
+
+    input.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = document.createElement('img');
+        img.src = ev.target.result;
+        img.className = 'preview-img';
+        photoPreviewDiv.innerHTML = '';
+        photoPreviewDiv.appendChild(img);
+        debouncedSave();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    previewContainer.parentElement.insertBefore(wrapper, previewContainer);
+    attachAutoSave();
+  }
+
+  function addInput(instId) {
+    const list = document.getElementById(`inputs-${instId}`);
+    const inputRowId = `input-${instId}-${Date.now()}`;
+    const row = document.createElement('div');
+    row.className = 'input-row';
+    row.id = inputRowId;
+    row.innerHTML = `
+      <input type="text" placeholder="e.g. Electricity (kWh), Natural Gas (m³), Steam (kg)...">
+      <button type="button" class="delete-input-btn" onclick="deleteInput('${inputRowId}')">×</button>
+    `;
+    list.appendChild(row);
+    attachAutoSave();
+  }
+
+  function deleteInput(rowId) {
+    document.getElementById(rowId)?.remove();
+    debouncedSave();
+  }
+
+  function deleteInstance(instId) {
+    if (confirm("Delete this instance?")) {
+      document.getElementById(instId)?.remove();
+      debouncedSave();
+    }
+  }
+
+  function deleteType(typeId) {
+    if (confirm("Delete this equipment type and all its instances?")) {
+      document.getElementById(typeId)?.remove();
+      debouncedSave();
+    }
+  }
+
+  // ================== IMPROVED PDF Generation ==================
+  document.getElementById('download-pdf').onclick = async () => {
+    if (!window.jspdf?.jsPDF) {
+      alert("PDF library not loaded. Check internet connection.");
+      return;
+    }
+
+    const progressDiv = document.getElementById('pdf-progress');
+    progressDiv.style.display = 'block';
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;
+      let y = margin;
+
+      // Helper to add new page if needed
+      const checkPageBreak = (neededSpace = 15) => {
+        if (y + neededSpace > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+      };
+
+      // Helper to add text with word wrap
+      const addText = (text, fontSize = 11, isBold = false) => {
+        checkPageBreak();
+        pdf.setFontSize(fontSize);
+        pdf.setFont(undefined, isBold ? 'bold' : 'normal');
+        const lines = pdf.splitTextToSize(text, maxWidth);
+        pdf.text(lines, margin, y);
+        y += lines.length * (fontSize * 0.4) + 3;
+      };
+
+      // Helper to add image
+      const addImage = async (imgSrc, label) => {
+        if (!imgSrc) return;
+        checkPageBreak(80);
+        addText(label, 10, true);
+        
+        try {
+          const img = new Image();
+          img.src = imgSrc;
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+
+          const imgWidth = maxWidth;
+          const imgHeight = (img.height / img.width) * imgWidth;
+          const finalHeight = Math.min(imgHeight, 120);
+          
+          checkPageBreak(finalHeight + 5);
+          pdf.addImage(imgSrc, 'JPEG', margin, y, imgWidth, finalHeight);
+          y += finalHeight + 8;
+        } catch (err) {
+          console.error("Error adding image:", err);
+          addText("[Image could not be loaded]", 9);
+        }
+      };
+
+      // Title
+      pdf.setFontSize(20);
+      pdf.setFont(undefined, 'bold');
+      pdf.text("Energy Audit Report", margin, y);
+      y += 12;
+
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+      y += 12;
+
+      // Basic Information
+      addText("1. BASIC INFORMATION", 14, true);
+      y += 3;
+
+      const basicFields = [
+        ["Company Name", document.getElementById("name")?.value],
+        ["Auditor Name", document.getElementById("auditor")?.value],
+        ["Address", document.getElementById("address")?.value],
+        ["Audit Date", document.getElementById("date")?.value],
+        ["Products Produced", document.getElementById("products")?.value],
+        ["Product Volume", document.getElementById("volume")?.value],
+        ["Operating Hours", document.getElementById("shift")?.value],
+        ["Number of Employees", document.getElementById("employee")?.value],
+        ["Raw Materials", document.getElementById("raw-materials")?.value],
+        ["Plant Area", document.getElementById("plant-area")?.value],
+        ["Process Description", document.getElementById("process-flow")?.value],
+      ];
+
+      for (const [label, value] of basicFields) {
+        if (value?.trim()) {
+          addText(`${label}: ${value.trim()}`, 11);
+        }
+      }
+
+      y += 5;
+
+      // Plant Layout Photo
+      const plantPhoto = document.getElementById('plant-photo-preview')?.querySelector('img')?.src;
+      if (plantPhoto) {
+        await addImage(plantPhoto, "Plant Layout:");
+      }
+
+      // Process Flow Photo
+      const processPhoto = document.getElementById('process-photo-preview')?.querySelector('img')?.src;
+      if (processPhoto) {
+        await addImage(processPhoto, "Process Flow Diagram:");
+      }
+
+      y += 10;
+
+      // Equipment Details
+      addText("2. EQUIPMENT DETAILS", 14, true);
+      y += 5;
+
+      const equipmentTypes = document.querySelectorAll('.equipment-type-block');
+      
+      if (equipmentTypes.length === 0) {
+        addText("No equipment data entered.", 11);
+      } else {
+        let typeNum = 1;
+        for (const typeBlock of equipmentTypes) {
+          checkPageBreak(20);
+          
+          const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || `Equipment Type ${typeNum}`;
+          addText(`\n${typeNum}. ${typeName}`, 12, true);
+          
+          const instances = typeBlock.querySelectorAll('.equipment-instance');
+          let instNum = 1;
+          
+          for (const instance of instances) {
+            checkPageBreak(15);
+            addText(`  Instance ${instNum}:`, 11, true);
+            
+            const desc = instance.querySelector('textarea')?.value.trim();
+            if (desc) addText(`    Description: ${desc}`, 10);
+            
+            const hours = instance.querySelector('input[type="text"]')?.value.trim();
+            if (hours) addText(`    Operating Hours: ${hours}`, 10);
+            
+            // Instance photos
+            const photos = instance.querySelectorAll('.instance-photo-preview img');
+            let photoNum = 1;
+            for (const photo of photos) {
+              await addImage(photo.src, `    Photo ${photoNum}:`);
+              photoNum++;
+            }
+            
+            y += 5;
+            instNum++;
+          }
+          
+          typeNum++;
+        }
+      }
+
+      // Save PDF
+      const companyName = document.getElementById("name")?.value.trim() || "Energy_Audit";
+      const date = document.getElementById("date")?.value || new Date().toISOString().split('T')[0];
+      const filename = `${companyName.replace(/\s+/g, '_')}_Energy_Audit_${date}.pdf`;
+      
+      pdf.save(filename);
+      
+      progressDiv.style.display = 'none';
+      alert("PDF generated successfully!");
+      
+    } catch (err) {
+      progressDiv.style.display = 'none';
+      alert("PDF generation failed: " + err.message);
+      console.error("PDF Error:", err);
+    }
+  };
+
+  // ================== Init ==================
+  document.getElementById('add-equipment-type').addEventListener('click', () => addEquipmentType());
+  document.getElementById('clear-draft').addEventListener('click', clearDraft);
+
+  // Plant Layout photo preview
+  document.getElementById('plant-layout')?.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const preview = document.getElementById('plant-photo-preview');
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      img.className = 'preview-img';
+      preview.appendChild(img);
+      debouncedSave();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Process Flow photo preview
+  document.getElementById('process-photo').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const preview = document.getElementById('process-photo-preview');
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      img.className = 'preview-img';
+      preview.appendChild(img);
+      debouncedSave();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Auto-save before page unload (but not during intentional clear)
+  let isClearing = false;
+  window.addEventListener('beforeunload', (e) => {
+    if (!isClearing) {
+      saveDraft(); // Force save on close
+    }
+  });
+
+  // Start
+  restoreDraft();
+  setTimeout(attachAutoSave, 300);
+</script>
+</body>
+</html>
