@@ -1,5 +1,5 @@
 # Energy Audit Tool
-Link: https://meftah416.github.io/Energy-Audit-Tool/
+Link: https://meftah416.github.io/Energy-Audit-Tool/  <br>
 A simple, offline-capable web tool for conducting energy audits with photo documentation.
 
 ## Features
