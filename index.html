@@ -105,18 +105,88 @@
     }
     .add-btn { background: #27ae60; color: white; }
     .delete-input-btn { background: #e67e22; color: white; }
+
+    /* ── Photo upload area ── */
     .photo-upload { margin-top: 12px; }
+
+    /* Photo choice buttons */
+    .photo-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .photo-btn-camera {
+      background: #2980b9;
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      font-weight: bold;
+    }
+    .photo-btn-gallery {
+      background: #8e44ad;
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      font-weight: bold;
+    }
+
+    /* Photo previews — small on screen, full-res in PDF */
     .photo-preview-container {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 8px;
       margin-top: 8px;
     }
     .photo-preview-container img {
-      max-width: 220px;
+      width: 100px;        /* small on screen */
+      height: 75px;
+      object-fit: cover;
       border: 1px solid #ddd;
       border-radius: 4px;
+      cursor: pointer;     /* tap to expand */
     }
+    /* Basic-info section previews (plant layout, process flow) */
+    #plant-photo-preview img,
+    #process-photo-preview img {
+      width: 120px;
+      height: 90px;
+      object-fit: cover;
+    }
+
+    /* Lightbox for full-size preview */
+    #lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    #lightbox.active { display: flex; }
+    #lightbox img {
+      max-width: 95vw;
+      max-height: 90vh;
+      border-radius: 6px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+    }
+    #lightbox-close {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      color: white;
+      font-size: 2em;
+      cursor: pointer;
+      line-height: 1;
+    }
+
     button.global-action {
       margin-right: 12px;
       padding: 10px 18px;
@@ -151,9 +221,30 @@
       border-radius: 4px;
       font-size: 0.9em;
     }
+    .backup-info {
+      background: #e3f2fd;
+      border: 1px solid #1976d2;
+      padding: 8px 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      font-size: 0.85em;
+      color: #0d47a1;
+    }
+
+    /* Add-instance button sits AFTER instances */
+    .add-instance-btn-row {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <span id="lightbox-close" onclick="closeLightbox()">✕</span>
+  <img id="lightbox-img" src="" alt="Full size preview">
+</div>
+
 <div class="container" id="content-to-pdf">
   <p style="text-align:center; color:#0000e9; margin-bottom: 24px;">
     Created by <a href="https://www.linkedin.com/in/meftah-uddin-972a78125/">Meftah Uddin</a> |
@@ -161,11 +252,15 @@
   </p>
   <h1>Energy Audit Tool</h1>
   <div class="storage-info" id="storage-info">
-    Using IndexedDB - Supports 50+ photos | <span id="photo-count">0 photos stored</span>
+    Using IndexedDB – Supports 50+ photos | <span id="photo-count">0 photos stored</span>
+  </div>
+  <div class="backup-info">
+    📥 <strong>Photo Backup:</strong> Each photo is automatically downloaded to your device's Downloads folder as a backup. Tap any thumbnail to view full size.
   </div>
   <div id="draft-status">Loading...</div>
   <div id="pdf-progress">Generating PDF... Please wait.</div>
 
+  <!-- =================== BASIC INFO =================== -->
   <div class="section">
     <h2>Basic Information</h2>
     <div class="basic-info">
@@ -181,18 +276,30 @@
       <p><label for="plant-area">Plant Area:</label> <textarea id="plant-area" rows="3" placeholder=""></textarea></p>
       <p>
         <label>Plant Layout:</label><br>
-        <input type="file" accept="image/*" id="plant-layout" capture="environment">
+        <div class="photo-buttons">
+          <button type="button" class="photo-btn-camera" onclick="document.getElementById('plant-layout-cam').click()">📷 Camera</button>
+          <button type="button" class="photo-btn-gallery" onclick="document.getElementById('plant-layout-file').click()">🖼 Gallery / Files</button>
+        </div>
+        <!-- hidden inputs -->
+        <input type="file" accept="image/*" capture="environment" id="plant-layout-cam" style="display:none">
+        <input type="file" accept="image/*" id="plant-layout-file" style="display:none">
         <div id="plant-photo-preview" class="photo-preview-container"></div>
       </p>
       <p><label for="process-flow">Process Description:</label> <textarea id="process-flow" rows="3" placeholder=""></textarea></p>
       <p>
         <label>Process Flow Diagram:</label><br>
-        <input type="file" accept="image/*" id="process-photo" capture="environment">
+        <div class="photo-buttons">
+          <button type="button" class="photo-btn-camera" onclick="document.getElementById('process-photo-cam').click()">📷 Camera</button>
+          <button type="button" class="photo-btn-gallery" onclick="document.getElementById('process-photo-file').click()">🖼 Gallery / Files</button>
+        </div>
+        <input type="file" accept="image/*" capture="environment" id="process-photo-cam" style="display:none">
+        <input type="file" accept="image/*" id="process-photo-file" style="display:none">
         <div id="process-photo-preview" class="photo-preview-container"></div>
       </p>
     </div>
   </div>
 
+  <!-- =================== EQUIPMENT =================== -->
   <div class="section">
     <h2>Equipment Details</h2>
     <div id="equipment-types-container"></div>
@@ -204,797 +311,624 @@
   </div>
 </div>
 
+<!-- ===================== SCRIPTS ===================== -->
 <script>
-  // ================== IndexedDB Setup ==================
-  const DB_NAME = 'EnergyAuditDB';
-  const DB_VERSION = 1;
-  const STORE_NAME = 'auditData';
-  const PHOTOS_STORE = 'photos';
-  let db;
+// ================== Lightbox ==================
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('active');
+  document.getElementById('lightbox-img').src = '';
+}
+document.getElementById('lightbox').addEventListener('click', function(e) {
+  if (e.target === this) closeLightbox();
+});
 
-  // Initialize IndexedDB
-  function initDB() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        db = request.result;
-        resolve(db);
-      };
-      
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        
-        // Create object stores if they don't exist
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains(PHOTOS_STORE)) {
-          db.createObjectStore(PHOTOS_STORE, { keyPath: 'id', autoIncrement: true });
-        }
-      };
-    });
-  }
+// ================== IndexedDB Setup ==================
+const DB_NAME = 'EnergyAuditDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'auditData';
+const PHOTOS_STORE = 'photos';
+let db;
 
-  // Save data to IndexedDB
-  function saveToIndexedDB(key, data) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put({ id: key, data: data });
-      
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Get data from IndexedDB
-  function getFromIndexedDB(key) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.get(key);
-      
-      request.onsuccess = () => resolve(request.result?.data);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Save photo to IndexedDB
-  function savePhoto(photoData) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([PHOTOS_STORE], 'readwrite');
-      const store = transaction.objectStore(PHOTOS_STORE);
-      const request = store.add({ data: photoData, timestamp: Date.now() });
-      
-      request.onsuccess = () => resolve(request.result); // Returns the photo ID
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Get photo from IndexedDB
-  function getPhoto(photoId) {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([PHOTOS_STORE], 'readonly');
-      const store = transaction.objectStore(PHOTOS_STORE);
-      const request = store.get(photoId);
-      
-      request.onsuccess = () => resolve(request.result?.data);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Get all photos
-  function getAllPhotos() {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([PHOTOS_STORE], 'readonly');
-      const store = transaction.objectStore(PHOTOS_STORE);
-      const request = store.getAll();
-      
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Clear all data
-  function clearAllData() {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME, PHOTOS_STORE], 'readwrite');
-      
-      transaction.objectStore(STORE_NAME).clear();
-      transaction.objectStore(PHOTOS_STORE).clear();
-      
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-
-  // ================== Image Compression ==================
-  function compressImage(file, maxWidth = 1200, quality = 0.8) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          // Calculate new dimensions
-          if (width > maxWidth) {
-            height = (height / width) * maxWidth;
-            width = maxWidth;
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          // Convert to base64 with compression
-          const compressed = canvas.toDataURL('image/jpeg', quality);
-          resolve(compressed);
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // ================== Core Variables ==================
-  let typeCounter = 0;
-  const container = document.getElementById('equipment-types-container');
-
-  // ================== Utilities ==================
-  function debounce(fn, delay = 800) {
-    let timer;
-    return (...args) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn(...args), delay);
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db = request.result; resolve(db); };
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(PHOTOS_STORE)) db.createObjectStore(PHOTOS_STORE, { keyPath: 'id', autoIncrement: true });
     };
-  }
-  const debouncedSave = debounce(saveDraft);
+  });
+}
 
-  // Update photo count
-  async function updatePhotoCount() {
-    try {
-      const photos = await getAllPhotos();
-      document.getElementById('photo-count').textContent = `${photos.length} photos stored`;
-    } catch (err) {
-      console.error('Error counting photos:', err);
-    }
-  }
+function saveToIndexedDB(key, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_NAME], 'readwrite');
+    tx.objectStore(STORE_NAME).put({ id: key, data });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
-  // ================== Core Functions ==================
-  async function getFormState() {
-    const state = {
-      basic: {
-        name: document.getElementById('name')?.value || '',
-        auditor: document.getElementById('auditor')?.value || '',
-        address: document.getElementById('address')?.value || '',
-        date: document.getElementById('date')?.value || '',
-        products: document.getElementById('products')?.value || '',
-        volume: document.getElementById('volume')?.value || '',
-        shift: document.getElementById('shift')?.value || '',
-        employee: document.getElementById('employee')?.value || '',
-        'raw-materials': document.getElementById('raw-materials')?.value || '',
-        'plant-area': document.getElementById('plant-area')?.value || '',
-        'process-flow': document.getElementById('process-flow')?.value || '',
-      },
-      plantLayoutPhotoId: null,
-      processPhotoId: null,
-      equipmentTypes: []
+function getFromIndexedDB(key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_NAME], 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(key);
+    req.onsuccess = () => resolve(req.result?.data);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function savePhoto(photoData) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([PHOTOS_STORE], 'readwrite');
+    const req = tx.objectStore(PHOTOS_STORE).add({ data: photoData, timestamp: Date.now() });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function getPhoto(photoId) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([PHOTOS_STORE], 'readonly');
+    const req = tx.objectStore(PHOTOS_STORE).get(photoId);
+    req.onsuccess = () => resolve(req.result?.data);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function getAllPhotos() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([PHOTOS_STORE], 'readonly');
+    const req = tx.objectStore(PHOTOS_STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function clearAllData() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_NAME, PHOTOS_STORE], 'readwrite');
+    tx.objectStore(STORE_NAME).clear();
+    tx.objectStore(PHOTOS_STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ================== Photo Backup (auto-download) ==================
+// Downloads the image file to the device so it's saved in Downloads even if IndexedDB is cleared.
+function backupPhotoToDevice(base64Data, label) {
+  try {
+    const a = document.createElement('a');
+    // Build a timestamped filename
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const safeName = (label || 'photo').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+    a.download = `EnergyAudit_${safeName}_${ts}.jpg`;
+    a.href = base64Data;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    console.warn('Auto-backup download failed (this is non-critical):', e);
+  }
+}
+
+// ================== Image Compression ==================
+// High quality for storage/PDF; separate thumbnail for display
+function compressImage(file, maxWidth = 1800, quality = 0.92) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = (h / w) * maxWidth; w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
     };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
-    // Get plant layout photo ID
-    const plantImg = document.getElementById('plant-photo-preview')?.querySelector('img');
-    if (plantImg && plantImg.dataset.photoId) {
-      state.plantLayoutPhotoId = parseInt(plantImg.dataset.photoId);
-    }
+// ================== Core Variables ==================
+let typeCounter = 0;
+const container = document.getElementById('equipment-types-container');
 
-    // Get process photo ID
-    const processImg = document.getElementById('process-photo-preview')?.querySelector('img');
-    if (processImg && processImg.dataset.photoId) {
-      state.processPhotoId = parseInt(processImg.dataset.photoId);
-    }
+// ================== Utilities ==================
+function debounce(fn, delay = 800) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+}
+const debouncedSave = debounce(saveDraft);
 
-    // Get equipment types
-    document.querySelectorAll('.equipment-type-block').forEach(typeBlock => {
-      const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || '';
-      const typeState = { name: typeName, instances: [] };
-      
-      typeBlock.querySelectorAll('.equipment-instance').forEach(instance => {
-        const desc = instance.querySelector('textarea')?.value.trim() || '';
-        const hours = instance.querySelector('input[type="text"]')?.value.trim() || '';
-        const photoIds = Array.from(instance.querySelectorAll('.instance-photo-preview img'))
-          .filter(img => img.dataset.photoId)
-          .map(img => parseInt(img.dataset.photoId));
-        
-        typeState.instances.push({ desc, hours, photoIds });
-      });
-      
-      if (typeName || typeState.instances.length > 0) {
-        state.equipmentTypes.push(typeState);
-      }
+async function updatePhotoCount() {
+  try {
+    const photos = await getAllPhotos();
+    document.getElementById('photo-count').textContent = `${photos.length} photos stored`;
+  } catch (e) { console.error(e); }
+}
+
+// ================== Form State ==================
+async function getFormState() {
+  const state = {
+    basic: {
+      name: document.getElementById('name')?.value || '',
+      auditor: document.getElementById('auditor')?.value || '',
+      address: document.getElementById('address')?.value || '',
+      date: document.getElementById('date')?.value || '',
+      products: document.getElementById('products')?.value || '',
+      volume: document.getElementById('volume')?.value || '',
+      shift: document.getElementById('shift')?.value || '',
+      employee: document.getElementById('employee')?.value || '',
+      'raw-materials': document.getElementById('raw-materials')?.value || '',
+      'plant-area': document.getElementById('plant-area')?.value || '',
+      'process-flow': document.getElementById('process-flow')?.value || '',
+    },
+    plantLayoutPhotoId: null,
+    processPhotoId: null,
+    equipmentTypes: []
+  };
+
+  const plantImg = document.getElementById('plant-photo-preview')?.querySelector('img');
+  if (plantImg?.dataset.photoId) state.plantLayoutPhotoId = parseInt(plantImg.dataset.photoId);
+
+  const processImg = document.getElementById('process-photo-preview')?.querySelector('img');
+  if (processImg?.dataset.photoId) state.processPhotoId = parseInt(processImg.dataset.photoId);
+
+  document.querySelectorAll('.equipment-type-block').forEach(typeBlock => {
+    const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || '';
+    const typeState = { name: typeName, instances: [] };
+    typeBlock.querySelectorAll('.equipment-instance').forEach(instance => {
+      const desc = instance.querySelector('textarea')?.value.trim() || '';
+      const hours = instance.querySelector('input[type="text"]')?.value.trim() || '';
+      const photoIds = Array.from(instance.querySelectorAll('.instance-photo-preview img'))
+        .filter(img => img.dataset.photoId)
+        .map(img => parseInt(img.dataset.photoId));
+      typeState.instances.push({ desc, hours, photoIds });
     });
-    
-    return state;
-  }
+    if (typeName || typeState.instances.length > 0) state.equipmentTypes.push(typeState);
+  });
 
-  async function saveDraft() {
-    try {
-      const state = await getFormState();
-      const hasContent = Object.values(state.basic).some(v => v.trim()) ||
-                         state.plantLayoutPhotoId ||
-                         state.processPhotoId ||
-                         state.equipmentTypes.length > 0;
+  return state;
+}
 
-      if (hasContent) {
-        await saveToIndexedDB('draft', state);
-        document.getElementById('draft-status').textContent =
-          `✓ Draft auto-saved at ${new Date().toLocaleTimeString()}`;
-        document.getElementById('draft-status').style.color = '#27ae60';
-        await updatePhotoCount();
-      } else {
-        document.getElementById('draft-status').textContent = 'No data to save yet';
-        document.getElementById('draft-status').style.color = '#999';
-      }
-    } catch (err) {
-      console.error("Error saving draft:", err);
-      document.getElementById('draft-status').textContent = '⚠ Save failed';
-      document.getElementById('draft-status').style.color = '#e74c3c';
-    }
-  }
-
-  async function restoreDraft() {
-    try {
-      const state = await getFromIndexedDB('draft');
-      if (!state) {
-        document.getElementById('draft-status').textContent = 'No saved draft - start entering data';
-        document.getElementById('draft-status').style.color = '#999';
-        await updatePhotoCount();
-        return;
-      }
-
-      // Restore basic fields
-      if (state.basic) {
-        Object.entries(state.basic).forEach(([id, val]) => {
-          const el = document.getElementById(id);
-          if (el) el.value = val || '';
-        });
-      }
-
-      // Restore Plant Layout photo
-      if (state.plantLayoutPhotoId) {
-        const photoData = await getPhoto(state.plantLayoutPhotoId);
-        if (photoData) {
-          const preview = document.getElementById('plant-photo-preview');
-          preview.innerHTML = '';
-          const img = document.createElement('img');
-          img.src = photoData;
-          img.dataset.photoId = state.plantLayoutPhotoId;
-          preview.appendChild(img);
-        }
-      }
-
-      // Restore Process Flow photo
-      if (state.processPhotoId) {
-        const photoData = await getPhoto(state.processPhotoId);
-        if (photoData) {
-          const preview = document.getElementById('process-photo-preview');
-          preview.innerHTML = '';
-          const img = document.createElement('img');
-          img.src = photoData;
-          img.dataset.photoId = state.processPhotoId;
-          preview.appendChild(img);
-        }
-      }
-
-      // Restore equipment
-      if (state.equipmentTypes?.length > 0) {
-        container.innerHTML = '';
-        typeCounter = 0;
-
-        for (const typeData of state.equipmentTypes) {
-          addEquipmentType(true);
-          const typeBlock = container.lastElementChild;
-          const typeNameInput = typeBlock.querySelector('input[id^="type-name-"]');
-          if (typeNameInput) typeNameInput.value = typeData.name || '';
-
-          const instancesDiv = typeBlock.querySelector('.instance-container');
-
-          for (const instData of typeData.instances) {
-            addInstance(typeBlock.id, typeCounter, true);
-            const instance = instancesDiv.lastElementChild;
-            
-            if (instance) {
-              instance.querySelector('textarea').value = instData.desc || '';
-              instance.querySelector('input[type="text"]').value = instData.hours || '';
-
-              // Restore photos
-              for (const photoId of (instData.photoIds || [])) {
-                const photoData = await getPhoto(photoId);
-                if (photoData) {
-                  addPhotoInput(instance.id);
-                  const allWrappers = Array.from(instance.querySelectorAll('.instance-photo-preview'))
-                    .map(div => div.parentElement)
-                    .filter(el => el.querySelector('input[type="file"]'));
-                  const lastWrapper = allWrappers[allWrappers.length - 1];
-                  
-                  if (lastWrapper) {
-                    const photoPreviewDiv = lastWrapper.querySelector('.instance-photo-preview');
-                    if (photoPreviewDiv) {
-                      const img = document.createElement('img');
-                      img.src = photoData;
-                      img.dataset.photoId = photoId;
-                      photoPreviewDiv.appendChild(img);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      document.getElementById('draft-status').textContent = '✓ Draft restored from previous session';
-      document.getElementById('draft-status').style.color = '#3498db';
+// ================== Save / Restore / Clear ==================
+async function saveDraft() {
+  try {
+    const state = await getFormState();
+    const hasContent = Object.values(state.basic).some(v => v.trim()) ||
+                       state.plantLayoutPhotoId || state.processPhotoId ||
+                       state.equipmentTypes.length > 0;
+    if (hasContent) {
+      await saveToIndexedDB('draft', state);
+      document.getElementById('draft-status').textContent = `✓ Draft auto-saved at ${new Date().toLocaleTimeString()}`;
+      document.getElementById('draft-status').style.color = '#27ae60';
       await updatePhotoCount();
-    } catch (err) {
-      console.error("Error restoring draft:", err);
-      document.getElementById('draft-status').textContent = '⚠ Error restoring draft';
-      document.getElementById('draft-status').style.color = '#e74c3c';
+    } else {
+      document.getElementById('draft-status').textContent = 'No data to save yet';
+      document.getElementById('draft-status').style.color = '#999';
     }
+  } catch (err) {
+    console.error("Error saving draft:", err);
+    document.getElementById('draft-status').textContent = '⚠ Save failed';
+    document.getElementById('draft-status').style.color = '#e74c3c';
   }
+}
 
-  async function clearDraft() {
-    if (confirm("Clear ALL saved draft data including all photos? This cannot be undone.")) {
-      try {
-        await clearAllData();
-        window.location.reload();
-      } catch (err) {
-        console.error("Error clearing draft:", err);
-        alert("Failed to clear draft. Please try again.");
-      }
-    }
-  }
-
-  function attachAutoSave() {
-    document.querySelectorAll('input, textarea, [type="file"]').forEach(el => {
-      el.removeEventListener('input', debouncedSave);
-      el.removeEventListener('change', debouncedSave);
-      el.addEventListener('input', debouncedSave);
-      el.addEventListener('change', debouncedSave);
-    });
-  }
-
-  // ================== UI Builders ==================
-  function addEquipmentType(skipDefaultInstance = false) {
-    typeCounter++;
-    const typeId = `type-${typeCounter}`;
-    const typeBlock = document.createElement('div');
-    typeBlock.className = 'equipment-type-block';
-    typeBlock.id = typeId;
-    typeBlock.innerHTML = `
-      <div class="equipment-type-header">
-        Equipment Type #${typeCounter}
-        <button class="delete-btn" onclick="deleteType('${typeId}')" style="margin-left:20px; position:static; background:#7f8c8d;">Delete Type</button>
-      </div>
-      <p><strong>Equipment Type / Name:</strong><br>
-        <input type="text" id="type-name-${typeCounter}" placeholder="">
-      </p>
-      <div style="margin: 16px 0;">
-        <button class="add-btn" onclick="addInstance('${typeId}', ${typeCounter})">+ Add Instance</button>
-      </div>
-      <div class="instance-container" id="instances-${typeId}"></div>
-    `;
-    container.appendChild(typeBlock);
-    if (!skipDefaultInstance) {
-      addInstance(typeId, typeCounter);
-    }
-    attachAutoSave();
-  }
-
-  function addInstance(typeId, typeNum, skipDefaults = false) {
-    const instancesDiv = document.getElementById(`instances-${typeId}`);
-    const currentInstances = instancesDiv.querySelectorAll('.equipment-instance').length;
-    const instanceNumber = currentInstances + 1;
-    const instId = `inst-${typeId}-${instanceNumber}`;
-    const instance = document.createElement('div');
-    instance.className = 'equipment-instance';
-    instance.id = instId;
-    instance.innerHTML = `
-      <button class="delete-btn" onclick="deleteInstance('${instId}')">Delete</button>
-      <div class="instance-header">Instance #${instanceNumber}</div>
-      <p><strong>Description / Model / Location:</strong><br>
-        <textarea placeholder="" rows="2"></textarea>
-      </p>
-      <p><strong>Hours of Operation:</strong><br>
-        <input type="text" placeholder="">
-      </p>
-      
-      <div class="photo-upload">
-        <strong>Name plate (Image):</strong><br>
-        <button type="button" class="add-btn" onclick="addPhotoInput('${instId}')">+ Add Photo</button>
-        <div class="instance-photo-preview photo-preview-container" id="photo-preview-${instId}"></div>
-      </div>
-    `;
-    instancesDiv.appendChild(instance);
-
-    if (!skipDefaults) {
-      addPhotoInput(instId);
-    }
-
-    attachAutoSave();
-  }
-
-  function addPhotoInput(instId) {
-    const previewContainer = document.getElementById(`photo-preview-${instId}`);
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
-    input.style.margin = '8px 0';
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.textContent = 'Remove';
-    removeBtn.className = 'delete-input-btn';
-    removeBtn.style.marginLeft = '10px';
-    removeBtn.onclick = () => { wrapper.remove(); debouncedSave(); };
-
-    const wrapper = document.createElement('div');
-    wrapper.style.display = 'flex';
-    wrapper.style.alignItems = 'center';
-    wrapper.appendChild(input);
-    wrapper.appendChild(removeBtn);
-
-    const photoPreviewDiv = document.createElement('div');
-    photoPreviewDiv.className = 'instance-photo-preview';
-    wrapper.appendChild(photoPreviewDiv);
-
-    input.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      try {
-        // Show loading message
-        photoPreviewDiv.innerHTML = '<small>Compressing...</small>';
-        
-        // Compress image
-        const compressed = await compressImage(file);
-        
-        // Save to IndexedDB
-        const photoId = await savePhoto(compressed);
-        
-        // Display preview
-        const img = document.createElement('img');
-        img.src = compressed;
-        img.dataset.photoId = photoId;
-        photoPreviewDiv.innerHTML = '';
-        photoPreviewDiv.appendChild(img);
-        
-        debouncedSave();
-      } catch (err) {
-        console.error('Error processing image:', err);
-        photoPreviewDiv.innerHTML = '<small style="color:red;">Error loading image</small>';
-      }
-    });
-
-    previewContainer.parentElement.insertBefore(wrapper, previewContainer);
-    attachAutoSave();
-  }
-
-  function deleteInstance(instId) {
-    if (confirm("Delete this instance?")) {
-      document.getElementById(instId)?.remove();
-      debouncedSave();
-    }
-  }
-
-  function deleteType(typeId) {
-    if (confirm("Delete this equipment type and all its instances?")) {
-      document.getElementById(typeId)?.remove();
-      debouncedSave();
-    }
-  }
-
-  // ================== PDF Generation ==================
-  document.getElementById('download-pdf').onclick = async () => {
-    if (!window.jspdf?.jsPDF) {
-      alert("PDF library not loaded. Check internet connection.");
+async function restoreDraft() {
+  try {
+    const state = await getFromIndexedDB('draft');
+    if (!state) {
+      document.getElementById('draft-status').textContent = 'No saved draft – start entering data';
+      document.getElementById('draft-status').style.color = '#999';
+      await updatePhotoCount();
       return;
     }
 
-    const progressDiv = document.getElementById('pdf-progress');
-    progressDiv.style.display = 'block';
+    if (state.basic) {
+      Object.entries(state.basic).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val || '';
+      });
+    }
 
-    try {
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const margin = 15;
-      const maxWidth = pageWidth - 2 * margin;
-      let y = margin;
-
-      const checkPageBreak = (neededSpace = 15) => {
-        if (y + neededSpace > pageHeight - margin) {
-          pdf.addPage();
-          y = margin;
-        }
-      };
-
-      const addText = (text, fontSize = 11, isBold = false) => {
-        checkPageBreak();
-        pdf.setFontSize(fontSize);
-        pdf.setFont(undefined, isBold ? 'bold' : 'normal');
-        const lines = pdf.splitTextToSize(text, maxWidth);
-        pdf.text(lines, margin, y);
-        y += lines.length * (fontSize * 0.4) + 3;
-      };
-
-      const addImage = async (photoId, label) => {
-        if (!photoId) return;
-        
-        checkPageBreak(8);
-        addText(label, 10, true);
-        
-        try {
-          const imgSrc = await getPhoto(photoId);
-          if (!imgSrc) return;
-          
-          const img = new Image();
-          img.src = imgSrc;
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-          });
-
-          const aspectRatio = img.width / img.height;
-          const maxImgWidth = maxWidth;
-          const maxImgHeight = 90;
-          
-          let imgWidth, imgHeight;
-          
-          if (aspectRatio > 1) {
-            imgWidth = maxImgWidth;
-            imgHeight = imgWidth / aspectRatio;
-            if (imgHeight > maxImgHeight) {
-              imgHeight = maxImgHeight;
-              imgWidth = imgHeight * aspectRatio;
-            }
-          } else {
-            imgHeight = maxImgHeight;
-            imgWidth = imgHeight * aspectRatio;
-            if (imgWidth > maxImgWidth) {
-              imgWidth = maxImgWidth;
-              imgHeight = imgWidth / aspectRatio;
-            }
-          }
-          
-          const remainingSpace = pageHeight - margin - y;
-          const requiredSpace = imgHeight + 5;
-          
-          if (requiredSpace > remainingSpace) {
-            pdf.addPage();
-            y = margin;
-          }
-          
-          if (y + imgHeight > pageHeight - margin) {
-            pdf.addPage();
-            y = margin;
-          }
-          
-          pdf.addImage(imgSrc, 'JPEG', margin, y, imgWidth, imgHeight);
-          y += imgHeight + 6;
-          
-        } catch (err) {
-          console.error("Error adding image:", err);
-          addText("[Image could not be loaded]", 9);
-        }
-      };
-
-      // Title
-      pdf.setFontSize(20);
-      pdf.setFont(undefined, 'bold');
-      pdf.text("Energy Audit Report", margin, y);
-      y += 12;
-
-      pdf.setFontSize(10);
-      pdf.setFont(undefined, 'normal');
-      pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
-      y += 12;
-
-      // Basic Information
-      addText("1. BASIC INFORMATION", 14, true);
-      y += 3;
-
-      const basicFields = [
-        ["Company Name", document.getElementById("name")?.value],
-        ["Auditor Name", document.getElementById("auditor")?.value],
-        ["Address", document.getElementById("address")?.value],
-        ["Audit Date", document.getElementById("date")?.value],
-        ["Products Produced", document.getElementById("products")?.value],
-        ["Product Volume", document.getElementById("volume")?.value],
-        ["Operating Hours", document.getElementById("shift")?.value],
-        ["Number of Employees", document.getElementById("employee")?.value],
-        ["Raw Materials", document.getElementById("raw-materials")?.value],
-        ["Plant Area", document.getElementById("plant-area")?.value],
-        ["Process Description", document.getElementById("process-flow")?.value],
-      ];
-
-      for (const [label, value] of basicFields) {
-        if (value?.trim()) {
-          addText(`${label}: ${value.trim()}`, 11);
-        }
+    if (state.plantLayoutPhotoId) {
+      const photoData = await getPhoto(state.plantLayoutPhotoId);
+      if (photoData) {
+        const preview = document.getElementById('plant-photo-preview');
+        preview.innerHTML = '';
+        const img = createThumb(photoData, state.plantLayoutPhotoId);
+        preview.appendChild(img);
       }
+    }
 
-      y += 5;
-
-      // Plant Layout Photo
-      const plantImg = document.getElementById('plant-photo-preview')?.querySelector('img');
-      if (plantImg && plantImg.dataset.photoId) {
-        await addImage(parseInt(plantImg.dataset.photoId), "Plant Layout:");
+    if (state.processPhotoId) {
+      const photoData = await getPhoto(state.processPhotoId);
+      if (photoData) {
+        const preview = document.getElementById('process-photo-preview');
+        preview.innerHTML = '';
+        const img = createThumb(photoData, state.processPhotoId);
+        preview.appendChild(img);
       }
+    }
 
-      // Process Flow Photo
-      const processImg = document.getElementById('process-photo-preview')?.querySelector('img');
-      if (processImg && processImg.dataset.photoId) {
-        await addImage(parseInt(processImg.dataset.photoId), "Process Flow Diagram:");
-      }
+    if (state.equipmentTypes?.length > 0) {
+      container.innerHTML = '';
+      typeCounter = 0;
+      for (const typeData of state.equipmentTypes) {
+        addEquipmentType(true);
+        const typeBlock = container.lastElementChild;
+        const typeNameInput = typeBlock.querySelector('input[id^="type-name-"]');
+        if (typeNameInput) typeNameInput.value = typeData.name || '';
 
-      y += 10;
-
-      // Equipment Details
-      checkPageBreak(20);
-      addText("2. EQUIPMENT DETAILS", 14, true);
-      y += 5;
-
-      const equipmentTypes = document.querySelectorAll('.equipment-type-block');
-      
-      if (equipmentTypes.length === 0) {
-        addText("No equipment data entered.", 11);
-      } else {
-        let typeNum = 1;
-        for (const typeBlock of equipmentTypes) {
-          checkPageBreak(25);
-          
-          const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || `Equipment Type ${typeNum}`;
-          addText(`${typeNum}. ${typeName}`, 12, true);
-          y += 2;
-          
-          const instances = typeBlock.querySelectorAll('.equipment-instance');
-          let instNum = 1;
-          
-          for (const instance of instances) {
-            checkPageBreak(20);
-            addText(`  Instance ${instNum}:`, 11, true);
-            
-            const desc = instance.querySelector('textarea')?.value.trim();
-            if (desc) {
-              checkPageBreak(15);
-              addText(`    Description: ${desc}`, 10);
-            }
-            
-            const hours = instance.querySelector('input[type="text"]')?.value.trim();
-            if (hours) {
-              checkPageBreak(10);
-              addText(`    Operating Hours: ${hours}`, 10);
-            }
-            
-            // Instance photos
-            const photos = instance.querySelectorAll('.instance-photo-preview img');
-            if (photos.length > 0) {
-              y += 3;
-              let photoNum = 1;
-              for (const photo of photos) {
-                if (photo.dataset.photoId) {
-                  const estimatedPhotoSpace = 60;
-                  if (y + estimatedPhotoSpace > pageHeight - margin) {
-                    pdf.addPage();
-                    y = margin;
-                  }
-                  await addImage(parseInt(photo.dataset.photoId), `    Photo ${photoNum}:`);
-                  photoNum++;
+        const instancesDiv = typeBlock.querySelector('.instance-container');
+        for (const instData of typeData.instances) {
+          addInstance(typeBlock.id, typeCounter, true);
+          const instance = instancesDiv.lastElementChild;
+          if (instance) {
+            instance.querySelector('textarea').value = instData.desc || '';
+            instance.querySelector('input[type="text"]').value = instData.hours || '';
+            for (const photoId of (instData.photoIds || [])) {
+              const photoData = await getPhoto(photoId);
+              if (photoData) {
+                const photoPreviewDiv = instance.querySelector('.instance-photo-preview');
+                if (photoPreviewDiv) {
+                  const img = createThumb(photoData, photoId);
+                  photoPreviewDiv.appendChild(img);
                 }
               }
             }
-            
-            y += 8;
-            instNum++;
           }
-          
-          y += 5;
-          typeNum++;
         }
       }
-
-      // Save PDF
-      const companyName = document.getElementById("name")?.value.trim() || "Energy_Audit";
-      const date = document.getElementById("date")?.value || new Date().toISOString().split('T')[0];
-      const filename = `${companyName.replace(/\s+/g, '_')}_Energy_Audit_${date}.pdf`;
-      
-      pdf.save(filename);
-      
-      progressDiv.style.display = 'none';
-      alert("PDF generated successfully!");
-      
-    } catch (err) {
-      progressDiv.style.display = 'none';
-      alert("PDF generation failed: " + err.message);
-      console.error("PDF Error:", err);
     }
-  };
 
-  // ================== Init ==================
-  document.getElementById('add-equipment-type').addEventListener('click', () => addEquipmentType());
-  document.getElementById('clear-draft').addEventListener('click', clearDraft);
+    document.getElementById('draft-status').textContent = '✓ Draft restored from previous session';
+    document.getElementById('draft-status').style.color = '#3498db';
+    await updatePhotoCount();
+  } catch (err) {
+    console.error("Error restoring draft:", err);
+    document.getElementById('draft-status').textContent = '⚠ Error restoring draft';
+    document.getElementById('draft-status').style.color = '#e74c3c';
+  }
+}
 
-  // Plant Layout photo handler
-  document.getElementById('plant-layout')?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const preview = document.getElementById('plant-photo-preview');
-    preview.innerHTML = '<small>Compressing image...</small>';
-    
+async function clearDraft() {
+  if (confirm("Clear ALL saved draft data including all photos? This cannot be undone.")) {
     try {
-      const compressed = await compressImage(file);
-      const photoId = await savePhoto(compressed);
-      
-      preview.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = compressed;
-      img.dataset.photoId = photoId;
-      preview.appendChild(img);
-      
-      debouncedSave();
+      await clearAllData();
+      window.location.reload();
     } catch (err) {
-      console.error('Error processing image:', err);
-      preview.innerHTML = '<small style="color:red;">Error loading image</small>';
+      console.error("Error clearing draft:", err);
+      alert("Failed to clear draft. Please try again.");
     }
-  });
+  }
+}
 
-  // Process Flow photo handler
-  document.getElementById('process-photo').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const preview = document.getElementById('process-photo-preview');
-    preview.innerHTML = '<small>Compressing image...</small>';
-    
-    try {
-      const compressed = await compressImage(file);
-      const photoId = await savePhoto(compressed);
-      
-      preview.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = compressed;
-      img.dataset.photoId = photoId;
-      preview.appendChild(img);
-      
-      debouncedSave();
-    } catch (err) {
-      console.error('Error processing image:', err);
-      preview.innerHTML = '<small style="color:red;">Error loading image</small>';
+function attachAutoSave() {
+  document.querySelectorAll('input:not([type="file"]), textarea').forEach(el => {
+    el.removeEventListener('input', debouncedSave);
+    el.addEventListener('input', debouncedSave);
+  });
+}
+
+// ================== Thumbnail helper ==================
+function createThumb(src, photoId) {
+  const img = document.createElement('img');
+  img.src = src;
+  if (photoId !== undefined) img.dataset.photoId = photoId;
+  img.title = 'Tap to view full size';
+  img.addEventListener('click', () => openLightbox(src));
+  return img;
+}
+
+// ================== UI Builders ==================
+function addEquipmentType(skipDefaultInstance = false) {
+  typeCounter++;
+  const typeId = `type-${typeCounter}`;
+  const typeBlock = document.createElement('div');
+  typeBlock.className = 'equipment-type-block';
+  typeBlock.id = typeId;
+  typeBlock.innerHTML = `
+    <div class="equipment-type-header">
+      Equipment Type #${typeCounter}
+      <button class="delete-btn" onclick="deleteType('${typeId}')" style="margin-left:20px;position:static;background:#7f8c8d;">Delete Type</button>
+    </div>
+    <p><strong>Equipment Type / Name:</strong><br>
+      <input type="text" id="type-name-${typeCounter}" placeholder="">
+    </p>
+    <div class="instance-container" id="instances-${typeId}"></div>
+    <div class="add-instance-btn-row">
+      <button class="add-btn" onclick="addInstance('${typeId}', ${typeCounter})">+ Add Instance</button>
+    </div>
+  `;
+  container.appendChild(typeBlock);
+  if (!skipDefaultInstance) addInstance(typeId, typeCounter);
+  attachAutoSave();
+}
+
+function addInstance(typeId, typeNum, skipDefaults = false) {
+  const instancesDiv = document.getElementById(`instances-${typeId}`);
+  const currentInstances = instancesDiv.querySelectorAll('.equipment-instance').length;
+  const instanceNumber = currentInstances + 1;
+  const instId = `inst-${typeId}-${instanceNumber}`;
+  const instance = document.createElement('div');
+  instance.className = 'equipment-instance';
+  instance.id = instId;
+  instance.innerHTML = `
+    <button class="delete-btn" onclick="deleteInstance('${instId}')">Delete</button>
+    <div class="instance-header">Instance #${instanceNumber}</div>
+    <p><strong>Description / Model / Location:</strong><br>
+      <textarea placeholder="" rows="2"></textarea>
+    </p>
+    <p><strong>Hours of Operation:</strong><br>
+      <input type="text" placeholder="">
+    </p>
+    <div class="photo-upload">
+      <strong>Name plate (Image):</strong><br>
+      <div class="photo-buttons" style="margin-bottom:6px;">
+        <button type="button" class="photo-btn-camera" onclick="triggerPhotoInput('${instId}','cam')">📷 Camera</button>
+        <button type="button" class="photo-btn-gallery" onclick="triggerPhotoInput('${instId}','file')">🖼 Gallery / Files</button>
+      </div>
+      <!-- hidden file inputs for this instance -->
+      <input type="file" accept="image/*" capture="environment" id="cam-${instId}" style="display:none">
+      <input type="file" accept="image/*" id="file-${instId}" style="display:none">
+      <div class="instance-photo-preview photo-preview-container" id="photo-preview-${instId}"></div>
+    </div>
+  `;
+  instancesDiv.appendChild(instance);
+
+  // Wire up hidden inputs
+  document.getElementById(`cam-${instId}`).addEventListener('change', (e) => handleInstancePhoto(e, instId));
+  document.getElementById(`file-${instId}`).addEventListener('change', (e) => handleInstancePhoto(e, instId));
+
+  attachAutoSave();
+}
+
+function triggerPhotoInput(instId, mode) {
+  const el = document.getElementById(mode === 'cam' ? `cam-${instId}` : `file-${instId}`);
+  if (el) el.click();
+}
+
+async function handleInstancePhoto(e, instId) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const previewContainer = document.getElementById(`photo-preview-${instId}`);
+  const loadingSpan = document.createElement('small');
+  loadingSpan.textContent = 'Compressing…';
+  previewContainer.appendChild(loadingSpan);
+
+  try {
+    const compressed = await compressImage(file);
+    const photoId = await savePhoto(compressed);
+
+    // Backup to device
+    backupPhotoToDevice(compressed, `instance_${instId}`);
+
+    const img = createThumb(compressed, photoId);
+    previewContainer.removeChild(loadingSpan);
+    previewContainer.appendChild(img);
+
+    e.target.value = ''; // reset so same file can be re-selected if needed
+    debouncedSave();
+  } catch (err) {
+    console.error('Error processing image:', err);
+    loadingSpan.textContent = 'Error loading image';
+    loadingSpan.style.color = 'red';
+  }
+}
+
+function deleteInstance(instId) {
+  if (confirm("Delete this instance?")) {
+    document.getElementById(instId)?.remove();
+    debouncedSave();
+  }
+}
+
+function deleteType(typeId) {
+  if (confirm("Delete this equipment type and all its instances?")) {
+    document.getElementById(typeId)?.remove();
+    debouncedSave();
+  }
+}
+
+// ================== Basic-info photo handlers ==================
+async function handleBasicPhoto(file, previewId, labelText) {
+  const preview = document.getElementById(previewId);
+  preview.innerHTML = '<small>Compressing image…</small>';
+  try {
+    const compressed = await compressImage(file);
+    const photoId = await savePhoto(compressed);
+
+    // Backup to device
+    backupPhotoToDevice(compressed, labelText);
+
+    preview.innerHTML = '';
+    const img = createThumb(compressed, photoId);
+    preview.appendChild(img);
+    debouncedSave();
+  } catch (err) {
+    console.error('Error processing image:', err);
+    preview.innerHTML = '<small style="color:red;">Error loading image</small>';
+  }
+}
+
+['plant-layout-cam', 'plant-layout-file'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (f) handleBasicPhoto(f, 'plant-photo-preview', 'PlantLayout');
+  });
+});
+
+['process-photo-cam', 'process-photo-file'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (f) handleBasicPhoto(f, 'process-photo-preview', 'ProcessFlow');
+  });
+});
+
+// ================== PDF Generation ==================
+document.getElementById('download-pdf').onclick = async () => {
+  if (!window.jspdf?.jsPDF) { alert("PDF library not loaded. Check internet connection."); return; }
+
+  const progressDiv = document.getElementById('pdf-progress');
+  progressDiv.style.display = 'block';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210, pageHeight = 297, margin = 15;
+    const maxWidth = pageWidth - 2 * margin;
+    let y = margin;
+
+    const checkPageBreak = (need = 15) => {
+      if (y + need > pageHeight - margin) { pdf.addPage(); y = margin; }
+    };
+
+    const addText = (text, fontSize = 11, isBold = false) => {
+      checkPageBreak();
+      pdf.setFontSize(fontSize);
+      pdf.setFont(undefined, isBold ? 'bold' : 'normal');
+      const lines = pdf.splitTextToSize(text, maxWidth);
+      pdf.text(lines, margin, y);
+      y += lines.length * (fontSize * 0.4) + 3;
+    };
+
+    const addImage = async (photoId, label) => {
+      if (!photoId) return;
+      checkPageBreak(8);
+      addText(label, 10, true);
+      try {
+        const imgSrc = await getPhoto(photoId);
+        if (!imgSrc) return;
+        const img = new Image();
+        img.src = imgSrc;
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+        const aspectRatio = img.width / img.height;
+        const maxImgW = maxWidth, maxImgH = 90;
+        let iw, ih;
+        if (aspectRatio > 1) {
+          iw = maxImgW; ih = iw / aspectRatio;
+          if (ih > maxImgH) { ih = maxImgH; iw = ih * aspectRatio; }
+        } else {
+          ih = maxImgH; iw = ih * aspectRatio;
+          if (iw > maxImgW) { iw = maxImgW; ih = iw / aspectRatio; }
+        }
+        if (y + ih > pageHeight - margin) { pdf.addPage(); y = margin; }
+        pdf.addImage(imgSrc, 'JPEG', margin, y, iw, ih);
+        y += ih + 6;
+      } catch (err) {
+        console.error("Error adding image:", err);
+        addText("[Image could not be loaded]", 9);
+      }
+    };
+
+    // Title
+    pdf.setFontSize(20); pdf.setFont(undefined, 'bold');
+    pdf.text("Energy Audit Report", margin, y); y += 12;
+    pdf.setFontSize(10); pdf.setFont(undefined, 'normal');
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, y); y += 12;
+
+    addText("1. BASIC INFORMATION", 14, true); y += 3;
+
+    const basicFields = [
+      ["Company Name", document.getElementById("name")?.value],
+      ["Auditor Name", document.getElementById("auditor")?.value],
+      ["Address", document.getElementById("address")?.value],
+      ["Audit Date", document.getElementById("date")?.value],
+      ["Products Produced", document.getElementById("products")?.value],
+      ["Product Volume", document.getElementById("volume")?.value],
+      ["Operating Hours", document.getElementById("shift")?.value],
+      ["Number of Employees", document.getElementById("employee")?.value],
+      ["Raw Materials", document.getElementById("raw-materials")?.value],
+      ["Plant Area", document.getElementById("plant-area")?.value],
+      ["Process Description", document.getElementById("process-flow")?.value],
+    ];
+    for (const [label, value] of basicFields) {
+      if (value?.trim()) addText(`${label}: ${value.trim()}`, 11);
     }
-  });
+    y += 5;
 
-  // Initialize
-  initDB()
-    .then(() => {
-      restoreDraft();
-      setTimeout(attachAutoSave, 300);
-    })
-    .catch(err => {
-      console.error('Failed to initialize database:', err);
-      alert('Failed to initialize storage. Please use a modern browser.');
-    });
+    const plantImg = document.getElementById('plant-photo-preview')?.querySelector('img');
+    if (plantImg?.dataset.photoId) await addImage(parseInt(plantImg.dataset.photoId), "Plant Layout:");
+
+    const processImg = document.getElementById('process-photo-preview')?.querySelector('img');
+    if (processImg?.dataset.photoId) await addImage(parseInt(processImg.dataset.photoId), "Process Flow Diagram:");
+
+    y += 10;
+    checkPageBreak(20);
+    addText("2. EQUIPMENT DETAILS", 14, true); y += 5;
+
+    const equipmentTypes = document.querySelectorAll('.equipment-type-block');
+    if (equipmentTypes.length === 0) {
+      addText("No equipment data entered.", 11);
+    } else {
+      let typeNum = 1;
+      for (const typeBlock of equipmentTypes) {
+        checkPageBreak(25);
+        const typeName = typeBlock.querySelector('input[id^="type-name-"]')?.value.trim() || `Equipment Type ${typeNum}`;
+        addText(`${typeNum}. ${typeName}`, 12, true); y += 2;
+        const instances = typeBlock.querySelectorAll('.equipment-instance');
+        let instNum = 1;
+        for (const instance of instances) {
+          checkPageBreak(20);
+          addText(`  Instance ${instNum}:`, 11, true);
+          const desc = instance.querySelector('textarea')?.value.trim();
+          if (desc) { checkPageBreak(15); addText(`    Description: ${desc}`, 10); }
+          const hours = instance.querySelector('input[type="text"]')?.value.trim();
+          if (hours) { checkPageBreak(10); addText(`    Operating Hours: ${hours}`, 10); }
+          const photos = instance.querySelectorAll('.instance-photo-preview img');
+          if (photos.length > 0) {
+            y += 3;
+            let photoNum = 1;
+            for (const photo of photos) {
+              if (photo.dataset.photoId) {
+                if (y + 60 > pageHeight - margin) { pdf.addPage(); y = margin; }
+                await addImage(parseInt(photo.dataset.photoId), `    Photo ${photoNum}:`);
+                photoNum++;
+              }
+            }
+          }
+          y += 8; instNum++;
+        }
+        y += 5; typeNum++;
+      }
+    }
+
+    const companyName = document.getElementById("name")?.value.trim() || "Energy_Audit";
+    const date = document.getElementById("date")?.value || new Date().toISOString().split('T')[0];
+    pdf.save(`${companyName.replace(/\s+/g, '_')}_Energy_Audit_${date}.pdf`);
+    progressDiv.style.display = 'none';
+    alert("PDF generated successfully!");
+  } catch (err) {
+    progressDiv.style.display = 'none';
+    alert("PDF generation failed: " + err.message);
+    console.error("PDF Error:", err);
+  }
+};
+
+// ================== Init ==================
+document.getElementById('add-equipment-type').addEventListener('click', () => addEquipmentType());
+document.getElementById('clear-draft').addEventListener('click', clearDraft);
+
+initDB()
+  .then(() => { restoreDraft(); setTimeout(attachAutoSave, 300); })
+  .catch(err => {
+    console.error('Failed to initialize database:', err);
+    alert('Failed to initialize storage. Please use a modern browser.');
+  });
 </script>
 </body>
 </html>
